@@ -1,12 +1,16 @@
 package handlers
 
-import "os"
+import (
+	"os"
+	"saymow/version-manager/app/pkg/errors"
+	"saymow/version-manager/app/repositories"
+)
 
 func UntrackFiles(paths []string) {
 	dir, err := os.Getwd()
-	check(err)
+	errors.Check(err)
 
-	repository := getRepository(dir)
+	repository := repositories.GetRepository(dir)
 
 	for _, path := range paths {
 		repository.RemoveFileIndex(path)

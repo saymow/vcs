@@ -1,7 +1,6 @@
-package handlers
+package repositories
 
 import (
-	"bufio"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -10,91 +9,12 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
-	fp "path/filepath"
+	path "path/filepath"
+	"saymow/version-manager/app/pkg/collections"
+	"saymow/version-manager/app/pkg/errors"
 	"slices"
 	"strings"
 )
-
-type Object struct {
-	filepath string
-	name     string
-}
-
-type Repository struct {
-	rootDir      string
-	indexObjects []*Object
-}
-
-const (
-	REPOSITORY_FOLDER_NAME = "repository"
-	OBJECTS_FOLDER_NAME    = "objects"
-	INDEX_FILE_NAME        = "index"
-)
-
-func check(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func FindIndex[T any](arr []T, callback func(T, int) bool) int {
-	for idx, element := range arr {
-		if callback(element, idx) {
-			return idx
-		}
-	}
-
-	return -1
-}
-
-func createRepository(dir string) *Repository {
-	err := os.Mkdir(fp.Join(dir, REPOSITORY_FOLDER_NAME), 0755)
-	check(err)
-
-	stageFile, err := os.Create(fp.Join(dir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
-	check(err)
-
-	_, err = stageFile.Write([]byte("Tracked files:\r\n\r\n"))
-	check(err)
-
-	check(err)
-
-	err = os.Mkdir(fp.Join(dir, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME), 0755)
-	check(err)
-
-	return &Repository{
-		rootDir:      dir,
-		indexObjects: []*Object{},
-	}
-}
-
-func getRepository(dir string) *Repository {
-	stageFile, err := os.OpenFile(path.Join(dir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_RDONLY, 0755)
-	check(err)
-
-	var stageObjects []*Object
-	scanner := bufio.NewScanner(stageFile)
-
-	// Skip file header lines
-	scanner.Scan()
-	scanner.Scan()
-
-	for scanner.Scan() {
-		object := Object{}
-
-		object.filepath = scanner.Text()
-		scanner.Scan()
-		object.name = scanner.Text()
-
-		stageObjects = append(stageObjects, &object)
-	}
-
-	return &Repository{
-		rootDir:      dir,
-		indexObjects: stageObjects,
-	}
-}
 
 func (repository *Repository) writeObject(filepath string, file *os.File) Object {
 	var buffer bytes.Buffer
@@ -111,45 +31,45 @@ func (repository *Repository) writeObject(filepath string, file *os.File) Object
 		}
 
 		_, err = buffer.Write(chunkBuffer[:n])
-		check(err)
+		errors.Check(err)
 	}
 
 	hasher := sha256.New()
 	_, err := hasher.Write(buffer.Bytes())
-	check(err)
+	errors.Check(err)
 	hash := hasher.Sum(nil)
 
 	objectName := hex.EncodeToString(hash)
 	objectFile, err := os.Create(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, objectName))
-	check(err)
+	errors.Check(err)
 	defer objectFile.Close()
 
 	gzipWriter := gzip.NewWriter(objectFile)
 	_, err = gzipWriter.Write(buffer.Bytes())
-	check(err)
+	errors.Check(err)
 
 	return Object{filepath, objectName}
 }
 
 func (repository *Repository) removeObject(name string) {
-	err := os.Remove(fp.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, name))
-	check(err)
+	err := os.Remove(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, name))
+	errors.Check(err)
 }
 
 func (repository *Repository) IndexFile(filepath string) {
-	if !fp.IsAbs(filepath) {
-		filepath = fp.Join(repository.rootDir, filepath)
+	if !path.IsAbs(filepath) {
+		filepath = path.Join(repository.rootDir, filepath)
 	}
 	if !strings.HasPrefix(filepath, repository.rootDir) {
 		log.Fatal("Invalid file path.")
 	}
 
 	file, err := os.Open(filepath)
-	check(err)
+	errors.Check(err)
 	defer file.Close()
 
 	object := repository.writeObject(filepath, file)
-	stageObjectIdx := FindIndex(repository.indexObjects, func(stageObject *Object, _ int) bool {
+	stageObjectIdx := collections.FindIndex(repository.indexObjects, func(stageObject *Object, _ int) bool {
 		return stageObject.filepath == filepath
 	})
 
@@ -166,14 +86,14 @@ func (repository *Repository) IndexFile(filepath string) {
 }
 
 func (repository *Repository) RemoveFileIndex(filepath string) {
-	if !fp.IsAbs(filepath) {
-		filepath = fp.Join(repository.rootDir, filepath)
+	if !path.IsAbs(filepath) {
+		filepath = path.Join(repository.rootDir, filepath)
 	}
 	if !strings.HasPrefix(filepath, repository.rootDir) {
 		log.Fatal("Invalid file path.")
 	}
 
-	objectIdx := FindIndex(repository.indexObjects, func(object *Object, _ int) bool {
+	objectIdx := collections.FindIndex(repository.indexObjects, func(object *Object, _ int) bool {
 		return object.filepath == filepath
 	})
 
@@ -186,14 +106,14 @@ func (repository *Repository) RemoveFileIndex(filepath string) {
 }
 
 func (repository *Repository) SaveIndex() {
-	file, err := os.OpenFile(fp.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
-	check(err)
+	file, err := os.OpenFile(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
+	errors.Check(err)
 
 	_, err = file.Write([]byte("Tracked files:\r\n\r\n"))
-	check(err)
+	errors.Check(err)
 
 	for _, object := range repository.indexObjects {
 		_, err = file.Write([]byte(fmt.Sprintf("%s\r\n%s\r\n", object.filepath, object.name)))
-		check(err)
+		errors.Check(err)
 	}
 }

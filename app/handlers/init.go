@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"os"
+	"saymow/version-manager/app/pkg/errors"
+	"saymow/version-manager/app/repositories"
 )
 
 func Init() {
 	currentDir, err := os.Getwd()
-	check(err)
+	errors.Check(err)
 
-	createRepository(currentDir)
+	repositories.CreateRepository(currentDir)
 }
