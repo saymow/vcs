@@ -4,7 +4,7 @@ import (
 	"os"
 )
 
-func HandleInit() {
+func Init() {
 	currentDir, err := os.Getwd()
 	check(err)
 

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"saymow/version-manager/handlers"
+	"saymow/version-manager/app/handlers"
 
 	"github.com/alecthomas/kong"
 )
@@ -11,7 +11,10 @@ var CLI struct {
 	} `cmd:"" help:"Initializes a repository in the current directory."`
 	Add struct {
 		Paths []string `arg:"" name:"path" help:"list of files paths." type:"path"`
-	} `cmd:"" help:"Add files to the stating area."`
+	} `cmd:"" help:"Add files to the index."`
+	Rm struct {
+		Paths []string `arg:"" name:"path" help:"list of files paths." type:"path"`
+	} `cmd:"" help:"Remove files from the index or working directory"`
 }
 
 func main() {
@@ -19,9 +22,11 @@ func main() {
 
 	switch ctx.Command() {
 	case "init":
-		handlers.HandleInit()
+		handlers.Init()
 	case "add <path>":
-		handlers.HandleTrackFiles(ctx.Args[1:])
+		handlers.TrackFiles(ctx.Args[1:])
+	case "rm <path>":
+		handlers.UntrackFiles(ctx.Args[1:])
 	default:
 		panic(ctx.Command())
 	}

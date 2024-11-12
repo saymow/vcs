@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	fp "path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -22,13 +23,13 @@ type Object struct {
 
 type Repository struct {
 	rootDir      string
-	stageObjects []*Object
+	indexObjects []*Object
 }
 
 const (
 	REPOSITORY_FOLDER_NAME = "repository"
-	OBJECT_FOLDER_NAME     = "objects"
-	STAGE_AREA_FILE_NAME   = "staging"
+	OBJECTS_FOLDER_NAME    = "objects"
+	INDEX_FILE_NAME        = "index"
 )
 
 func check(err error) {
@@ -51,7 +52,7 @@ func createRepository(dir string) *Repository {
 	err := os.Mkdir(fp.Join(dir, REPOSITORY_FOLDER_NAME), 0755)
 	check(err)
 
-	stageFile, err := os.Create(fp.Join(dir, REPOSITORY_FOLDER_NAME, STAGE_AREA_FILE_NAME))
+	stageFile, err := os.Create(fp.Join(dir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
 	check(err)
 
 	_, err = stageFile.Write([]byte("Tracked files:\r\n\r\n"))
@@ -59,17 +60,17 @@ func createRepository(dir string) *Repository {
 
 	check(err)
 
-	err = os.Mkdir(fp.Join(dir, REPOSITORY_FOLDER_NAME, OBJECT_FOLDER_NAME), 0755)
+	err = os.Mkdir(fp.Join(dir, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME), 0755)
 	check(err)
 
 	return &Repository{
 		rootDir:      dir,
-		stageObjects: []*Object{},
+		indexObjects: []*Object{},
 	}
 }
 
 func getRepository(dir string) *Repository {
-	stageFile, err := os.OpenFile(path.Join(dir, REPOSITORY_FOLDER_NAME, STAGE_AREA_FILE_NAME), os.O_RDONLY, 0755)
+	stageFile, err := os.OpenFile(path.Join(dir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_RDONLY, 0755)
 	check(err)
 
 	var stageObjects []*Object
@@ -91,7 +92,7 @@ func getRepository(dir string) *Repository {
 
 	return &Repository{
 		rootDir:      dir,
-		stageObjects: stageObjects,
+		indexObjects: stageObjects,
 	}
 }
 
@@ -119,7 +120,7 @@ func (repository *Repository) writeObject(filepath string, file *os.File) Object
 	hash := hasher.Sum(nil)
 
 	objectName := hex.EncodeToString(hash)
-	objectFile, err := os.Create(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, OBJECT_FOLDER_NAME, objectName))
+	objectFile, err := os.Create(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, objectName))
 	check(err)
 	defer objectFile.Close()
 
@@ -131,11 +132,11 @@ func (repository *Repository) writeObject(filepath string, file *os.File) Object
 }
 
 func (repository *Repository) removeObject(name string) {
-	err := os.Remove(fp.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, OBJECT_FOLDER_NAME, name))
+	err := os.Remove(fp.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, name))
 	check(err)
 }
 
-func (repository *Repository) StageFile(filepath string) {
+func (repository *Repository) IndexFile(filepath string) {
 	if !fp.IsAbs(filepath) {
 		filepath = fp.Join(repository.rootDir, filepath)
 	}
@@ -148,30 +149,50 @@ func (repository *Repository) StageFile(filepath string) {
 	defer file.Close()
 
 	object := repository.writeObject(filepath, file)
-	stageObjectIdx := FindIndex(repository.stageObjects, func(stageObject *Object, _ int) bool {
+	stageObjectIdx := FindIndex(repository.indexObjects, func(stageObject *Object, _ int) bool {
 		return stageObject.filepath == filepath
 	})
 
 	if stageObjectIdx != -1 {
 		// Update existing stage object name
-		if repository.stageObjects[stageObjectIdx].name != object.name {
-			repository.removeObject(repository.stageObjects[stageObjectIdx].name)
-			repository.stageObjects[stageObjectIdx].name = object.name
+		if repository.indexObjects[stageObjectIdx].name != object.name {
+			repository.removeObject(repository.indexObjects[stageObjectIdx].name)
+			repository.indexObjects[stageObjectIdx].name = object.name
 		}
 	} else {
 		// Create stage object
-		repository.stageObjects = append(repository.stageObjects, &object)
+		repository.indexObjects = append(repository.indexObjects, &object)
 	}
 }
 
-func (repository *Repository) SaveStagedFiles() {
-	file, err := os.OpenFile(fp.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, STAGE_AREA_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
+func (repository *Repository) RemoveFileIndex(filepath string) {
+	if !fp.IsAbs(filepath) {
+		filepath = fp.Join(repository.rootDir, filepath)
+	}
+	if !strings.HasPrefix(filepath, repository.rootDir) {
+		log.Fatal("Invalid file path.")
+	}
+
+	objectIdx := FindIndex(repository.indexObjects, func(object *Object, _ int) bool {
+		return object.filepath == filepath
+	})
+
+	if objectIdx == -1 {
+		return
+	}
+
+	repository.removeObject(repository.indexObjects[objectIdx].name)
+	repository.indexObjects = slices.Delete(repository.indexObjects, objectIdx, objectIdx+1)
+}
+
+func (repository *Repository) SaveIndex() {
+	file, err := os.OpenFile(fp.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
 	check(err)
 
 	_, err = file.Write([]byte("Tracked files:\r\n\r\n"))
 	check(err)
 
-	for _, object := range repository.stageObjects {
+	for _, object := range repository.indexObjects {
 		_, err = file.Write([]byte(fmt.Sprintf("%s\r\n%s\r\n", object.filepath, object.name)))
 		check(err)
 	}
