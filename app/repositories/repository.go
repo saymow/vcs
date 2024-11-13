@@ -14,9 +14,10 @@ import (
 	"saymow/version-manager/app/pkg/errors"
 	"slices"
 	"strings"
+	"time"
 )
 
-func (repository *Repository) writeObject(filepath string, file *os.File) Object {
+func (repository *Repository) writeObject(filepath string, file *os.File) *Object {
 	var buffer bytes.Buffer
 	chunkBuffer := make([]byte, 1024)
 
@@ -48,7 +49,7 @@ func (repository *Repository) writeObject(filepath string, file *os.File) Object
 	_, err = gzipWriter.Write(buffer.Bytes())
 	errors.Check(err)
 
-	return Object{filepath, objectName}
+	return &Object{filepath, objectName}
 }
 
 func (repository *Repository) removeObject(name string) {
@@ -69,19 +70,19 @@ func (repository *Repository) IndexFile(filepath string) {
 	defer file.Close()
 
 	object := repository.writeObject(filepath, file)
-	stageObjectIdx := collections.FindIndex(repository.indexObjects, func(stageObject *Object, _ int) bool {
+	stageObjectIdx := collections.FindIndex(repository.index, func(stageObject *Object, _ int) bool {
 		return stageObject.filepath == filepath
 	})
 
 	if stageObjectIdx != -1 {
 		// Update existing stage object name
-		if repository.indexObjects[stageObjectIdx].name != object.name {
-			repository.removeObject(repository.indexObjects[stageObjectIdx].name)
-			repository.indexObjects[stageObjectIdx].name = object.name
+		if repository.index[stageObjectIdx].name != object.name {
+			repository.removeObject(repository.index[stageObjectIdx].name)
+			repository.index[stageObjectIdx].name = object.name
 		}
 	} else {
 		// Create stage object
-		repository.indexObjects = append(repository.indexObjects, &object)
+		repository.index = append(repository.index, object)
 	}
 }
 
@@ -93,7 +94,7 @@ func (repository *Repository) RemoveFileIndex(filepath string) {
 		log.Fatal("Invalid file path.")
 	}
 
-	objectIdx := collections.FindIndex(repository.indexObjects, func(object *Object, _ int) bool {
+	objectIdx := collections.FindIndex(repository.index, func(object *Object, _ int) bool {
 		return object.filepath == filepath
 	})
 
@@ -101,8 +102,8 @@ func (repository *Repository) RemoveFileIndex(filepath string) {
 		return
 	}
 
-	repository.removeObject(repository.indexObjects[objectIdx].name)
-	repository.indexObjects = slices.Delete(repository.indexObjects, objectIdx, objectIdx+1)
+	repository.removeObject(repository.index[objectIdx].name)
+	repository.index = slices.Delete(repository.index, objectIdx, objectIdx+1)
 }
 
 func (repository *Repository) SaveIndex() {
@@ -112,8 +113,79 @@ func (repository *Repository) SaveIndex() {
 	_, err = file.Write([]byte("Tracked files:\r\n\r\n"))
 	errors.Check(err)
 
-	for _, object := range repository.indexObjects {
+	for _, object := range repository.index {
 		_, err = file.Write([]byte(fmt.Sprintf("%s\r\n%s\r\n", object.filepath, object.name)))
 		errors.Check(err)
 	}
+}
+
+func (repository *Repository) CreateSave(message string) *Save {
+	if len(repository.index) == 0 {
+		errors.Error("Cannot save empty index.")
+	}
+
+	save := Save{
+		message:   message,
+		parent:    repository.head,
+		objects:   repository.index,
+		createdAt: time.Now(),
+	}
+
+	name := repository.writeSave(&save)
+	repository.clearIndex()
+	repository.writeHead(name)
+
+	return &save
+}
+
+func (repository *Repository) writeSave(save *Save) string {
+	var stringBuilder strings.Builder
+
+	_, err := stringBuilder.Write([]byte(fmt.Sprintf("%s\r\n", save.message)))
+	errors.Check(err)
+
+	_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\r\n", save.parent)))
+	errors.Check(err)
+
+	_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\r\n\r\n", save.createdAt.Format(time.Layout))))
+	errors.Check(err)
+
+	_, err = stringBuilder.Write([]byte("Please do not edit the lines below.\r\n\r\nFiles:\r\n"))
+	errors.Check(err)
+
+	for _, object := range save.objects {
+		_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\r\n%s\r\n", object.filepath, object.name)))
+		errors.Check(err)
+	}
+
+	saveContent := stringBuilder.String()
+
+	hasher := sha256.New()
+	_, err = hasher.Write([]byte(saveContent))
+	errors.Check(err)
+	hash := hasher.Sum(nil)
+
+	saveName := hex.EncodeToString(hash)
+
+	file, err := os.Create(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
+	errors.Check(err)
+	defer file.Close()
+
+	_, err = file.Write([]byte(saveContent))
+	errors.Check(err)
+
+	return saveName
+}
+
+func (repository *Repository) clearIndex() {
+	repository.index = []*Object{}
+	repository.SaveIndex()
+}
+
+func (repository *Repository) writeHead(name string) {
+	file, err := os.OpenFile(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
+	errors.Check(err)
+
+	_, err = file.Write([]byte(name))
+	errors.Check(err)
 }

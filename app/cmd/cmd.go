@@ -15,6 +15,9 @@ var CLI struct {
 	Rm struct {
 		Paths []string `arg:"" name:"path" help:"list of files paths." type:"path"`
 	} `cmd:"" help:"Remove files from the index or working directory"`
+	Save struct {
+		Message string `arg:"" name:"message" help:"Save message."`
+	} `cmd:"" help:"Create a save point using the current index."`
 }
 
 func Start() {
@@ -27,6 +30,8 @@ func Start() {
 		handlers.TrackFiles(ctx.Args[1:])
 	case "rm <path>":
 		handlers.UntrackFiles(ctx.Args[1:])
+	case "save <message>":
+		handlers.Save(ctx.Args[1])
 	default:
 		panic(ctx.Command())
 	}

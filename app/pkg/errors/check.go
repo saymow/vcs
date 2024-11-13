@@ -7,3 +7,7 @@ func Check(err error) {
 		log.Fatal(err)
 	}
 }
+
+func Error(message string) {
+	log.Fatal(message)
+}
