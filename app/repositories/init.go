@@ -8,7 +8,6 @@ import (
 	fp "path/filepath"
 	"saymow/version-manager/app/pkg/errors"
 	"slices"
-	"strings"
 	"time"
 )
 
@@ -42,10 +41,10 @@ type Dir struct {
 }
 
 type Repository struct {
-	rootDir string
-	head    string
-	index   []*Object
-	wd      Dir
+	root  string
+	head  string
+	index []*Object
+	dir   Dir
 }
 
 const (
@@ -56,31 +55,31 @@ const (
 	HEAD_FILE_NAME         = "head"
 )
 
-func CreateRepository(dir string) *Repository {
-	err := os.Mkdir(fp.Join(dir, REPOSITORY_FOLDER_NAME), 0755)
+func CreateRepository(root string) *Repository {
+	err := os.Mkdir(fp.Join(root, REPOSITORY_FOLDER_NAME), 0755)
 	errors.Check(err)
 
-	indexFile, err := os.Create(fp.Join(dir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
+	indexFile, err := os.Create(fp.Join(root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
 	errors.Check(err)
 	defer indexFile.Close()
 
 	_, err = indexFile.Write([]byte("Tracked files:\r\n\r\n"))
 	errors.Check(err)
 
-	headFile, err := os.Create(fp.Join(dir, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME))
+	headFile, err := os.Create(fp.Join(root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME))
 	errors.Check(err)
 	defer headFile.Close()
 
-	err = os.Mkdir(fp.Join(dir, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME), 0755)
+	err = os.Mkdir(fp.Join(root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME), 0755)
 	errors.Check(err)
 
-	err = os.Mkdir(fp.Join(dir, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME), 0755)
+	err = os.Mkdir(fp.Join(root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME), 0755)
 	errors.Check(err)
 
 	return &Repository{
-		rootDir: dir,
-		index:   []*Object{},
-		wd:      Dir{},
+		root:  root,
+		index: []*Object{},
+		dir:   Dir{},
 	}
 }
 
@@ -116,47 +115,13 @@ func readHead(file *os.File) string {
 	return string(buffer[:n])
 }
 
-func addDirNodeHelper(segments []string, dir *Dir, object *Object) {
-	if len(segments) == 1 {
-		dir.children[segments[0]] = Node{
-			nodeType: FileType,
-			file:     *object,
-		}
-
-		return
-	}
-
-	subdirName := segments[0]
-	var node Node
-
-	if _, ok := dir.children[subdirName]; ok {
-		node = dir.children[subdirName]
-	} else {
-		node = Node{
-			nodeType: DirType,
-			dir:      Dir{make(map[string]Node)},
-		}
-		dir.children[subdirName] = node
-	}
-
-	addDirNodeHelper(segments[1:], &node.dir, object)
-}
-
-func addDirNode(rootDir string, dir *Dir, object *Object) {
-	// len(rootDir)+1 to skip initial /. E.g, turn "base/a/b/c/file" to "a/b/c/file"
-	normalizedPath := object.filepath[len(rootDir)+1:]
-	segments := strings.Split(normalizedPath, string(fp.Separator))
-
-	addDirNodeHelper(segments, dir, object)
-}
-
-func buildDir(rootDir string, head string) Dir {
+func buildDir(root string, head string) Dir {
 	dir := Dir{make(map[string]Node)}
 	objects := []Object{}
 	saveName := head
 
 	for saveName != "" {
-		file, err := os.Open(path.Join(rootDir, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
+		file, err := os.Open(path.Join(root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
 		errors.Check(err)
 
 		scanner := bufio.NewScanner(file)
@@ -194,30 +159,32 @@ func buildDir(rootDir string, head string) Dir {
 	slices.Reverse(objects)
 
 	for _, object := range objects {
-		addDirNode(rootDir, &dir, &object)
+		// len(rootDir)+1 to skip initial /. E.g, turn "base/a/b/c/file" to "a/b/c/file"
+		normalizedPath := object.filepath[len(root)+1:]
+		dir.addNode(normalizedPath, &object)
 	}
 
 	return dir
 }
 
-func GetRepository(dir string) *Repository {
-	indexFile, err := os.OpenFile(path.Join(dir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_RDONLY, 0755)
+func GetRepository(root string) *Repository {
+	indexFile, err := os.OpenFile(path.Join(root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_RDONLY, 0755)
 	errors.Check(err)
 	defer indexFile.Close()
 
 	index := readIndex(indexFile)
 
-	headFile, err := os.OpenFile(path.Join(dir, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_RDONLY, 0755)
+	headFile, err := os.OpenFile(path.Join(root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_RDONLY, 0755)
 	errors.Check(err)
 	defer headFile.Close()
 
 	head := readHead(headFile)
-	wd := buildDir(dir, head)
+	dir := buildDir(root, head)
 
 	return &Repository{
-		rootDir: dir,
-		index:   index,
-		head:    head,
-		wd:      wd,
+		root:  root,
+		index: index,
+		head:  head,
+		dir:   dir,
 	}
 }

@@ -41,7 +41,7 @@ func (repository *Repository) writeObject(filepath string, file *os.File) *Objec
 	hash := hasher.Sum(nil)
 
 	objectName := hex.EncodeToString(hash)
-	objectFile, err := os.Create(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, objectName))
+	objectFile, err := os.Create(path.Join(repository.root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, objectName))
 	errors.Check(err)
 	defer objectFile.Close()
 
@@ -53,15 +53,15 @@ func (repository *Repository) writeObject(filepath string, file *os.File) *Objec
 }
 
 func (repository *Repository) removeObject(name string) {
-	err := os.Remove(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, name))
+	err := os.Remove(path.Join(repository.root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, name))
 	errors.Check(err)
 }
 
 func (repository *Repository) IndexFile(filepath string) {
 	if !path.IsAbs(filepath) {
-		filepath = path.Join(repository.rootDir, filepath)
+		filepath = path.Join(repository.root, filepath)
 	}
-	if !strings.HasPrefix(filepath, repository.rootDir) {
+	if !strings.HasPrefix(filepath, repository.root) {
 		log.Fatal("Invalid file path.")
 	}
 
@@ -88,9 +88,9 @@ func (repository *Repository) IndexFile(filepath string) {
 
 func (repository *Repository) RemoveFileIndex(filepath string) {
 	if !path.IsAbs(filepath) {
-		filepath = path.Join(repository.rootDir, filepath)
+		filepath = path.Join(repository.root, filepath)
 	}
-	if !strings.HasPrefix(filepath, repository.rootDir) {
+	if !strings.HasPrefix(filepath, repository.root) {
 		log.Fatal("Invalid file path.")
 	}
 
@@ -107,7 +107,7 @@ func (repository *Repository) RemoveFileIndex(filepath string) {
 }
 
 func (repository *Repository) SaveIndex() {
-	file, err := os.OpenFile(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
+	file, err := os.OpenFile(path.Join(repository.root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
 	errors.Check(err)
 
 	_, err = file.Write([]byte("Tracked files:\r\n\r\n"))
@@ -167,7 +167,7 @@ func (repository *Repository) writeSave(save *Save) string {
 
 	saveName := hex.EncodeToString(hash)
 
-	file, err := os.Create(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
+	file, err := os.Create(path.Join(repository.root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
 	errors.Check(err)
 	defer file.Close()
 
@@ -183,7 +183,7 @@ func (repository *Repository) clearIndex() {
 }
 
 func (repository *Repository) writeHead(name string) {
-	file, err := os.OpenFile(path.Join(repository.rootDir, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
+	file, err := os.OpenFile(path.Join(repository.root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
 	errors.Check(err)
 
 	_, err = file.Write([]byte(name))
