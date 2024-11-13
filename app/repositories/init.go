@@ -7,6 +7,8 @@ import (
 	"path"
 	fp "path/filepath"
 	"saymow/version-manager/app/pkg/errors"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -22,10 +24,28 @@ type Save struct {
 	objects   []*Object
 }
 
+type NodeType int
+
+const (
+	FileType NodeType = iota
+	DirType
+)
+
+type Node struct {
+	nodeType NodeType
+	file     Object
+	dir      Dir
+}
+
+type Dir struct {
+	children map[string]Node
+}
+
 type Repository struct {
 	rootDir string
 	head    string
 	index   []*Object
+	wd      Dir
 }
 
 const (
@@ -60,16 +80,13 @@ func CreateRepository(dir string) *Repository {
 	return &Repository{
 		rootDir: dir,
 		index:   []*Object{},
+		wd:      Dir{},
 	}
 }
 
-func GetRepository(dir string) *Repository {
-	stageFile, err := os.OpenFile(path.Join(dir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_RDONLY, 0755)
-	errors.Check(err)
-	defer stageFile.Close()
-
+func readIndex(file *os.File) []*Object {
 	var index []*Object
-	scanner := bufio.NewScanner(stageFile)
+	scanner := bufio.NewScanner(file)
 
 	// Skip file header lines
 	scanner.Scan()
@@ -85,23 +102,122 @@ func GetRepository(dir string) *Repository {
 		index = append(index, &object)
 	}
 
-	headFile, err := os.OpenFile(path.Join(dir, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_RDONLY, 0755)
-	errors.Check(err)
-	defer headFile.Close()
+	return index
+}
 
-	head := ""
+func readHead(file *os.File) string {
 	buffer := make([]byte, 128)
-	n, err := headFile.Read(buffer)
+	n, err := file.Read(buffer)
 
 	if err != nil && err != io.EOF {
 		errors.Error(err.Error())
 	}
 
-	head = string(buffer[:n])
+	return string(buffer[:n])
+}
+
+func addDirNodeHelper(segments []string, dir *Dir, object *Object) {
+	if len(segments) == 1 {
+		dir.children[segments[0]] = Node{
+			nodeType: FileType,
+			file:     *object,
+		}
+
+		return
+	}
+
+	subdirName := segments[0]
+	var node Node
+
+	if _, ok := dir.children[subdirName]; ok {
+		node = dir.children[subdirName]
+	} else {
+		node = Node{
+			nodeType: DirType,
+			dir:      Dir{make(map[string]Node)},
+		}
+		dir.children[subdirName] = node
+	}
+
+	addDirNodeHelper(segments[1:], &node.dir, object)
+}
+
+func addDirNode(rootDir string, dir *Dir, object *Object) {
+	// len(rootDir)+1 to skip initial /. E.g, turn "base/a/b/c/file" to "a/b/c/file"
+	normalizedPath := object.filepath[len(rootDir)+1:]
+	segments := strings.Split(normalizedPath, string(fp.Separator))
+
+	addDirNodeHelper(segments, dir, object)
+}
+
+func buildDir(rootDir string, head string) Dir {
+	dir := Dir{make(map[string]Node)}
+	objects := []Object{}
+	saveName := head
+
+	for saveName != "" {
+		file, err := os.Open(path.Join(rootDir, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
+		errors.Check(err)
+
+		scanner := bufio.NewScanner(file)
+
+		// Skip save message
+		scanner.Scan()
+
+		// Scan parent hash
+		scanner.Scan()
+		saveName = scanner.Text()
+
+		// Skip createdAt
+		scanner.Scan()
+		// Skip newline
+		scanner.Scan()
+		// Skip warn message
+		scanner.Scan()
+		// Skip newline
+		scanner.Scan()
+		// Skip header message
+		scanner.Scan()
+
+		for scanner.Scan() {
+			object := Object{}
+
+			object.filepath = scanner.Text()
+			scanner.Scan()
+			object.name = scanner.Text()
+			objects = append(objects, object)
+		}
+
+		file.Close()
+	}
+
+	slices.Reverse(objects)
+
+	for _, object := range objects {
+		addDirNode(rootDir, &dir, &object)
+	}
+
+	return dir
+}
+
+func GetRepository(dir string) *Repository {
+	indexFile, err := os.OpenFile(path.Join(dir, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_RDONLY, 0755)
+	errors.Check(err)
+	defer indexFile.Close()
+
+	index := readIndex(indexFile)
+
+	headFile, err := os.OpenFile(path.Join(dir, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_RDONLY, 0755)
+	errors.Check(err)
+	defer headFile.Close()
+
+	head := readHead(headFile)
+	wd := buildDir(dir, head)
 
 	return &Repository{
 		rootDir: dir,
 		index:   index,
 		head:    head,
+		wd:      wd,
 	}
 }
