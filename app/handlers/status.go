@@ -21,12 +21,18 @@ func Status() {
 	for _, path := range status.Staged.ModifiedFilePaths {
 		fmt.Printf("\t- %s (modified)\r\n", path)
 	}
+	for _, path := range status.Staged.RemovedFilePaths {
+		fmt.Printf("\t- %s (removed)\r\n", path)
+	}
 
 	fmt.Println("Untracked changes:")
+	for _, path := range status.WorkingDir.UntrackedFilePaths {
+		fmt.Printf("\t- %s (created)\r\n", path)
+	}
 	for _, path := range status.WorkingDir.ModifiedFilePaths {
 		fmt.Printf("\t- %s (modified)\r\n", path)
 	}
-	for _, path := range status.WorkingDir.UntrackedFilePaths {
-		fmt.Printf("\t- %s (created)\r\n", path)
+	for _, path := range status.WorkingDir.RemovedFilePaths {
+		fmt.Printf("\t- %s (removed)\r\n", path)
 	}
 }

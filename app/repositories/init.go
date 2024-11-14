@@ -8,6 +8,7 @@ import (
 	fp "path/filepath"
 	"saymow/version-manager/app/pkg/errors"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -16,11 +17,28 @@ type File struct {
 	objectName string
 }
 
+type FileRemoval struct {
+	filepath string
+}
+
+type ChangeType int
+
+const (
+	Modified ChangeType = iota
+	Removal
+)
+
+type Change struct {
+	changeType ChangeType
+	modified   *File
+	removal    *FileRemoval
+}
+
 type Save struct {
 	message   string
 	createdAt time.Time
 	parent    string
-	files     []*File
+	changes   []*Change
 }
 
 type NodeType int
@@ -32,18 +50,18 @@ const (
 
 type Node struct {
 	nodeType NodeType
-	file     File
-	dir      Dir
+	file     *File
+	dir      *Dir
 }
 
 type Dir struct {
-	children map[string]Node
+	children map[string]*Node
 }
 
 type Repository struct {
 	root  string
 	head  string
-	index []*File
+	index []*Change
 	dir   Dir
 }
 
@@ -53,6 +71,9 @@ const (
 	SAVES_FOLDER_NAME      = "saves"
 	INDEX_FILE_NAME        = "index"
 	HEAD_FILE_NAME         = "head"
+
+	MODIFIED_CHANGE = "(modified)"
+	REMOVAL_CHANGE  = "(removed)"
 )
 
 func CreateRepository(root string) *Repository {
@@ -78,13 +99,13 @@ func CreateRepository(root string) *Repository {
 
 	return &Repository{
 		root:  root,
-		index: []*File{},
+		index: []*Change{},
 		dir:   Dir{},
 	}
 }
 
-func readIndex(file *os.File) []*File {
-	var index []*File
+func readIndex(file *os.File) []*Change {
+	var index []*Change
 	scanner := bufio.NewScanner(file)
 
 	// Skip file header lines
@@ -92,13 +113,27 @@ func readIndex(file *os.File) []*File {
 	scanner.Scan()
 
 	for scanner.Scan() {
-		object := File{}
+		change := Change{}
 
-		object.filepath = scanner.Text()
-		scanner.Scan()
-		object.objectName = scanner.Text()
+		changeHeader := strings.Split(scanner.Text(), "\t")
 
-		index = append(index, &object)
+		if len(changeHeader) != 2 {
+			errors.Error("Invalid index format.")
+		}
+
+		if changeHeader[1] == MODIFIED_CHANGE {
+			change.changeType = Modified
+			change.modified = &File{}
+			change.modified.filepath = changeHeader[0]
+			scanner.Scan()
+			change.modified.objectName = scanner.Text()
+		} else {
+			change.changeType = Removal
+			change.removal = &FileRemoval{}
+			change.removal.filepath = changeHeader[0]
+		}
+
+		index = append(index, &change)
 	}
 
 	return index
@@ -116,8 +151,8 @@ func readHead(file *os.File) string {
 }
 
 func buildDir(root string, head string) Dir {
-	dir := Dir{make(map[string]Node)}
-	objects := []File{}
+	dir := Dir{make(map[string]*Node)}
+	changes := []Change{}
 	saveName := head
 
 	for saveName != "" {
@@ -141,27 +176,52 @@ func buildDir(root string, head string) Dir {
 		scanner.Scan()
 		// Skip newline
 		scanner.Scan()
+		// Skip newline
+		scanner.Scan()
 		// Skip header message
+		scanner.Scan()
+		// Skip newline
 		scanner.Scan()
 
 		for scanner.Scan() {
-			object := File{}
+			change := Change{}
 
-			object.filepath = scanner.Text()
-			scanner.Scan()
-			object.objectName = scanner.Text()
-			objects = append(objects, object)
+			changeHeader := strings.Split(scanner.Text(), "\t")
+
+			if len(changeHeader) != 2 {
+				errors.Error("Invalid save format.")
+			}
+
+			if changeHeader[1] == MODIFIED_CHANGE {
+				change.changeType = Modified
+				change.modified = &File{}
+				change.modified.filepath = changeHeader[0]
+				scanner.Scan()
+				change.modified.objectName = scanner.Text()
+			} else {
+				change.changeType = Removal
+				change.removal = &FileRemoval{}
+				change.removal.filepath = changeHeader[0]
+			}
+
+			changes = append(changes, change)
 		}
 
 		file.Close()
 	}
 
-	slices.Reverse(objects)
+	slices.Reverse(changes)
 
-	for _, object := range objects {
-		// len(rootDir)+1 to skip initial /. E.g, turn "base/a/b/c/file" to "a/b/c/file"
-		normalizedPath := object.filepath[len(root)+1:]
-		dir.addNode(normalizedPath, &object)
+	for _, change := range changes {
+		var normalizedPath string
+
+		if change.changeType == Modified {
+			normalizedPath = change.modified.filepath[len(root)+1:]
+		} else {
+			normalizedPath = change.removal.filepath[len(root)+1:]
+		}
+
+		dir.addNode(normalizedPath, &change)
 	}
 
 	return dir
