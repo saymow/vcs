@@ -11,16 +11,16 @@ import (
 	"time"
 )
 
-type Object struct {
-	filepath string
-	name     string
+type File struct {
+	filepath   string
+	objectName string
 }
 
 type Save struct {
 	message   string
 	createdAt time.Time
 	parent    string
-	objects   []*Object
+	files     []*File
 }
 
 type NodeType int
@@ -32,7 +32,7 @@ const (
 
 type Node struct {
 	nodeType NodeType
-	file     Object
+	file     File
 	dir      Dir
 }
 
@@ -43,7 +43,7 @@ type Dir struct {
 type Repository struct {
 	root  string
 	head  string
-	index []*Object
+	index []*File
 	dir   Dir
 }
 
@@ -78,13 +78,13 @@ func CreateRepository(root string) *Repository {
 
 	return &Repository{
 		root:  root,
-		index: []*Object{},
+		index: []*File{},
 		dir:   Dir{},
 	}
 }
 
-func readIndex(file *os.File) []*Object {
-	var index []*Object
+func readIndex(file *os.File) []*File {
+	var index []*File
 	scanner := bufio.NewScanner(file)
 
 	// Skip file header lines
@@ -92,11 +92,11 @@ func readIndex(file *os.File) []*Object {
 	scanner.Scan()
 
 	for scanner.Scan() {
-		object := Object{}
+		object := File{}
 
 		object.filepath = scanner.Text()
 		scanner.Scan()
-		object.name = scanner.Text()
+		object.objectName = scanner.Text()
 
 		index = append(index, &object)
 	}
@@ -117,7 +117,7 @@ func readHead(file *os.File) string {
 
 func buildDir(root string, head string) Dir {
 	dir := Dir{make(map[string]Node)}
-	objects := []Object{}
+	objects := []File{}
 	saveName := head
 
 	for saveName != "" {
@@ -145,11 +145,11 @@ func buildDir(root string, head string) Dir {
 		scanner.Scan()
 
 		for scanner.Scan() {
-			object := Object{}
+			object := File{}
 
 			object.filepath = scanner.Text()
 			scanner.Scan()
-			object.name = scanner.Text()
+			object.objectName = scanner.Text()
 			objects = append(objects, object)
 		}
 

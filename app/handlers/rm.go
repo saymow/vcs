@@ -13,7 +13,7 @@ func UntrackFiles(paths []string) {
 	repository := repositories.GetRepository(dir)
 
 	for _, path := range paths {
-		repository.RemoveFileIndex(path)
+		repository.RemoveFile(path)
 	}
 
 	repository.SaveIndex()

@@ -29,7 +29,7 @@ type RepositoryStatus struct {
 	}
 }
 
-func (repository *Repository) writeObject(filepath string, file *os.File) *Object {
+func (repository *Repository) writeObject(filepath string, file *os.File) *File {
 	var buffer bytes.Buffer
 	chunkBuffer := make([]byte, 1024)
 
@@ -61,7 +61,7 @@ func (repository *Repository) writeObject(filepath string, file *os.File) *Objec
 	_, err = gzipWriter.Write(buffer.Bytes())
 	errors.Check(err)
 
-	return &Object{filepath, objectName}
+	return &File{filepath, objectName}
 }
 
 func (repository *Repository) removeObject(name string) {
@@ -85,17 +85,17 @@ func (repository *Repository) IndexFile(filepath string) {
 	stagedObject := repository.findStagedObject(filepath)
 	savedObject := repository.findSavedObject(filepath)
 
-	if savedObject != nil && savedObject.name == object.name {
+	if savedObject != nil && savedObject.objectName == object.objectName {
 		// No changes at all
 		if stagedObject != nil {
 			// Undo index changes if any
-			repository.RemoveFileIndex(filepath)
+			repository.RemoveFile(filepath)
 		}
 	} else if stagedObject != nil {
-		if stagedObject.name != object.name {
+		if stagedObject.objectName != object.objectName {
 			// Update stage object if an update really exists
-			repository.removeObject(stagedObject.name)
-			stagedObject.name = object.name
+			repository.removeObject(stagedObject.objectName)
+			stagedObject.objectName = object.objectName
 		}
 	} else {
 		// Create stage object
@@ -103,7 +103,7 @@ func (repository *Repository) IndexFile(filepath string) {
 	}
 }
 
-func (repository *Repository) RemoveFileIndex(filepath string) {
+func (repository *Repository) RemoveFile(filepath string) {
 	if !path.IsAbs(filepath) {
 		filepath = path.Join(repository.root, filepath)
 	}
@@ -111,16 +111,30 @@ func (repository *Repository) RemoveFileIndex(filepath string) {
 		log.Fatal("Invalid file path.")
 	}
 
-	objectIdx := collections.FindIndex(repository.index, func(object *Object, _ int) bool {
+	stagedObjectIdx := collections.FindIndex(repository.index, func(object *File, _ int) bool {
 		return object.filepath == filepath
 	})
+	savedObject := repository.findSavedObject(filepath)
 
-	if objectIdx == -1 {
+	if stagedObjectIdx == -1 && savedObject == nil {
+		// Nothing to be removed
 		return
 	}
 
-	repository.removeObject(repository.index[objectIdx].name)
-	repository.index = slices.Delete(repository.index, objectIdx, objectIdx+1)
+	if stagedObjectIdx != -1 {
+		if repository.index[stagedObjectIdx].objectName == "" {
+			// Index entry is already meant for removal
+			return
+		}
+
+		// Remove from the index
+		repository.removeObject(repository.index[stagedObjectIdx].objectName)
+		repository.index = slices.Delete(repository.index, stagedObjectIdx, stagedObjectIdx+1)
+	}
+	if savedObject != nil {
+		// Create Index file removal entry
+		repository.index = append(repository.index, &File{objectName: "", filepath: filepath})
+	}
 }
 
 func (repository *Repository) SaveIndex() {
@@ -131,7 +145,7 @@ func (repository *Repository) SaveIndex() {
 	errors.Check(err)
 
 	for _, object := range repository.index {
-		_, err = file.Write([]byte(fmt.Sprintf("%s\r\n%s\r\n", object.filepath, object.name)))
+		_, err = file.Write([]byte(fmt.Sprintf("%s\r\n%s\r\n", object.filepath, object.objectName)))
 		errors.Check(err)
 	}
 }
@@ -144,7 +158,7 @@ func (repository *Repository) CreateSave(message string) *Save {
 	save := Save{
 		message:   message,
 		parent:    repository.head,
-		objects:   repository.index,
+		files:     repository.index,
 		createdAt: time.Now(),
 	}
 
@@ -170,8 +184,8 @@ func (repository *Repository) writeSave(save *Save) string {
 	_, err = stringBuilder.Write([]byte("Please do not edit the lines below.\r\n\r\nFiles:\r\n"))
 	errors.Check(err)
 
-	for _, object := range save.objects {
-		_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\r\n%s\r\n", object.filepath, object.name)))
+	for _, object := range save.files {
+		_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\r\n%s\r\n", object.filepath, object.objectName)))
 		errors.Check(err)
 	}
 
@@ -195,7 +209,7 @@ func (repository *Repository) writeSave(save *Save) string {
 }
 
 func (repository *Repository) clearIndex() {
-	repository.index = []*Object{}
+	repository.index = []*File{}
 	repository.SaveIndex()
 }
 
@@ -207,8 +221,8 @@ func (repository *Repository) writeHead(name string) {
 	errors.Check(err)
 }
 
-func (repository *Repository) findStagedObject(filepath string) *Object {
-	objectIdx := collections.FindIndex(repository.index, func(item *Object, _ int) bool {
+func (repository *Repository) findStagedObject(filepath string) *File {
+	objectIdx := collections.FindIndex(repository.index, func(item *File, _ int) bool {
 		return item.filepath == filepath
 	})
 
@@ -219,9 +233,9 @@ func (repository *Repository) findStagedObject(filepath string) *Object {
 	return repository.index[objectIdx]
 }
 
-func (repository *Repository) findSavedObject(filepath string) *Object {
+func (repository *Repository) findSavedObject(filepath string) *File {
 	normalizedPath := filepath[len(repository.root)+1:]
-	return repository.dir.findObject(normalizedPath)
+	return repository.dir.findFile(normalizedPath)
 }
 
 func (repository *Repository) GetStatus() *RepositoryStatus {
@@ -272,15 +286,15 @@ func (repository *Repository) GetStatus() *RepositoryStatus {
 		if stagedObject != nil {
 			if savedObject == nil {
 				status.Staged.CreatedFilesPaths = append(status.Staged.CreatedFilesPaths, filepath)
-			} else if stagedObject.name != savedObject.name {
+			} else if stagedObject.objectName != savedObject.objectName {
 				status.Staged.ModifiedFilePaths = append(status.Staged.ModifiedFilePaths, filepath)
 			}
 
-			if stagedObject.name != hash {
+			if stagedObject.objectName != hash {
 				status.WorkingDir.ModifiedFilePaths = append(status.WorkingDir.ModifiedFilePaths, filepath)
 			}
 		} else {
-			if savedObject.name != hash {
+			if savedObject.objectName != hash {
 				status.WorkingDir.ModifiedFilePaths = append(status.WorkingDir.ModifiedFilePaths, filepath)
 			}
 		}

@@ -5,11 +5,11 @@ import (
 	"strings"
 )
 
-func (root *Dir) addNodeHelper(segments []string, object *Object) {
+func (root *Dir) addNodeHelper(segments []string, file *File) {
 	if len(segments) == 1 {
 		root.children[segments[0]] = Node{
 			nodeType: FileType,
-			file:     *object,
+			file:     *file,
 		}
 
 		return
@@ -28,16 +28,16 @@ func (root *Dir) addNodeHelper(segments []string, object *Object) {
 		root.children[subdirName] = node
 	}
 
-	node.dir.addNodeHelper(segments[1:], object)
+	node.dir.addNodeHelper(segments[1:], file)
 }
 
-func (root *Dir) addNode(path string, object *Object) {
+func (root *Dir) addNode(path string, file *File) {
 	segments := strings.Split(path, string(fp.Separator))
 
-	root.addNodeHelper(segments, object)
+	root.addNodeHelper(segments, file)
 }
 
-func (root *Dir) findNodeHelper(segments []string) *Object {
+func (root *Dir) findNodeHelper(segments []string) *File {
 	if len(segments) == 1 {
 		node, ok := root.children[segments[0]]
 
@@ -58,7 +58,7 @@ func (root *Dir) findNodeHelper(segments []string) *Object {
 	return node.dir.findNodeHelper(segments[1:])
 }
 
-func (root *Dir) findObject(path string) *Object {
+func (root *Dir) findFile(path string) *File {
 	segments := strings.Split(path, string(fp.Separator))
 
 	return root.findNodeHelper(segments)
