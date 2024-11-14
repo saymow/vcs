@@ -18,6 +18,8 @@ var CLI struct {
 	Save struct {
 		Message string `arg:"" name:"message" help:"Save message."`
 	} `cmd:"" help:"Create a save point using the current index."`
+	Status struct {
+	} `cmd:"" help:"Check the current working status."`
 }
 
 func Start() {
@@ -32,6 +34,8 @@ func Start() {
 		handlers.UntrackFiles(ctx.Args[1:])
 	case "save <message>":
 		handlers.Save(ctx.Args[1])
+	case "status":
+		handlers.Status()
 	default:
 		panic(ctx.Command())
 	}

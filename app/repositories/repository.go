@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	path "path/filepath"
@@ -16,6 +17,17 @@ import (
 	"strings"
 	"time"
 )
+
+type RepositoryStatus struct {
+	Staged struct {
+		CreatedFilesPaths []string
+		ModifiedFilePaths []string
+	}
+	WorkingDir struct {
+		ModifiedFilePaths  []string
+		UntrackedFilePaths []string
+	}
+}
 
 func (repository *Repository) writeObject(filepath string, file *os.File) *Object {
 	var buffer bytes.Buffer
@@ -188,4 +200,84 @@ func (repository *Repository) writeHead(name string) {
 
 	_, err = file.Write([]byte(name))
 	errors.Check(err)
+}
+
+func (repository *Repository) findIndexObject(path string) *Object {
+	objectIdx := collections.FindIndex(repository.index, func(item *Object, _ int) bool {
+		return item.filepath == path
+	})
+
+	if objectIdx == -1 {
+		return nil
+	}
+
+	return repository.index[objectIdx]
+}
+
+func (repository *Repository) GetStatus() *RepositoryStatus {
+	status := RepositoryStatus{}
+
+	path.Walk(repository.root, func(filepath string, info fs.FileInfo, err error) error {
+		errors.Check(err)
+		if repository.root == filepath || strings.HasPrefix(filepath, path.Join(repository.root, REPOSITORY_FOLDER_NAME)) {
+			return nil
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		normalizedPath := filepath[len(repository.root)+1:]
+		savedObject := repository.dir.findObject(normalizedPath)
+		stagedObject := repository.findIndexObject(filepath)
+
+		if savedObject == nil && stagedObject == nil {
+			status.WorkingDir.UntrackedFilePaths = append(status.WorkingDir.UntrackedFilePaths, filepath)
+			return nil
+		}
+
+		file, err := os.Open(filepath)
+		errors.Check(err)
+
+		var buffer bytes.Buffer
+		chunkBuffer := make([]byte, 1024)
+
+		for {
+			n, err := file.Read(chunkBuffer)
+
+			if err != nil && err != io.EOF {
+				errors.Error(err.Error())
+			}
+			if n == 0 {
+				break
+			}
+
+			_, err = buffer.Write(chunkBuffer[:n])
+			errors.Check(err)
+		}
+
+		hasher := sha256.New()
+		_, err = hasher.Write(buffer.Bytes())
+		errors.Check(err)
+		hash := hex.EncodeToString(hasher.Sum(nil))
+
+		if stagedObject != nil {
+			if savedObject == nil {
+				status.Staged.CreatedFilesPaths = append(status.Staged.CreatedFilesPaths, filepath)
+			} else if stagedObject.name != savedObject.name {
+				status.Staged.ModifiedFilePaths = append(status.Staged.ModifiedFilePaths, filepath)
+			}
+
+			if stagedObject.name != hash {
+				status.WorkingDir.ModifiedFilePaths = append(status.WorkingDir.ModifiedFilePaths, filepath)
+			}
+		} else {
+			if savedObject.name != hash {
+				status.WorkingDir.ModifiedFilePaths = append(status.WorkingDir.ModifiedFilePaths, filepath)
+			}
+		}
+
+		return nil
+	})
+
+	return &status
 }

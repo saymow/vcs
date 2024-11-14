@@ -36,3 +36,30 @@ func (root *Dir) addNode(path string, object *Object) {
 
 	root.addNodeHelper(segments, object)
 }
+
+func (root *Dir) findNodeHelper(segments []string) *Object {
+	if len(segments) == 1 {
+		node, ok := root.children[segments[0]]
+
+		if !ok || node.nodeType != FileType {
+			return nil
+		}
+
+		return &node.file
+	}
+
+	subdirName := segments[0]
+	node, ok := root.children[subdirName]
+
+	if !ok || node.nodeType != DirType {
+		return nil
+	}
+
+	return node.dir.findNodeHelper(segments[1:])
+}
+
+func (root *Dir) findObject(path string) *Object {
+	segments := strings.Split(path, string(fp.Separator))
+
+	return root.findNodeHelper(segments)
+}
