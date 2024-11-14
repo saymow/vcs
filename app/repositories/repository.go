@@ -82,15 +82,20 @@ func (repository *Repository) IndexFile(filepath string) {
 	defer file.Close()
 
 	object := repository.writeObject(filepath, file)
-	stageObjectIdx := collections.FindIndex(repository.index, func(stageObject *Object, _ int) bool {
-		return stageObject.filepath == filepath
-	})
+	stagedObject := repository.findStagedObject(filepath)
+	savedObject := repository.findSavedObject(filepath)
 
-	if stageObjectIdx != -1 {
-		// Update existing stage object name
-		if repository.index[stageObjectIdx].name != object.name {
-			repository.removeObject(repository.index[stageObjectIdx].name)
-			repository.index[stageObjectIdx].name = object.name
+	if savedObject != nil && savedObject.name == object.name {
+		// No changes at all
+		if stagedObject != nil {
+			// Undo index changes if any
+			repository.RemoveFileIndex(filepath)
+		}
+	} else if stagedObject != nil {
+		if stagedObject.name != object.name {
+			// Update stage object if an update really exists
+			repository.removeObject(stagedObject.name)
+			stagedObject.name = object.name
 		}
 	} else {
 		// Create stage object
@@ -202,9 +207,9 @@ func (repository *Repository) writeHead(name string) {
 	errors.Check(err)
 }
 
-func (repository *Repository) findIndexObject(path string) *Object {
+func (repository *Repository) findStagedObject(filepath string) *Object {
 	objectIdx := collections.FindIndex(repository.index, func(item *Object, _ int) bool {
-		return item.filepath == path
+		return item.filepath == filepath
 	})
 
 	if objectIdx == -1 {
@@ -212,6 +217,11 @@ func (repository *Repository) findIndexObject(path string) *Object {
 	}
 
 	return repository.index[objectIdx]
+}
+
+func (repository *Repository) findSavedObject(filepath string) *Object {
+	normalizedPath := filepath[len(repository.root)+1:]
+	return repository.dir.findObject(normalizedPath)
 }
 
 func (repository *Repository) GetStatus() *RepositoryStatus {
@@ -226,9 +236,8 @@ func (repository *Repository) GetStatus() *RepositoryStatus {
 			return nil
 		}
 
-		normalizedPath := filepath[len(repository.root)+1:]
-		savedObject := repository.dir.findObject(normalizedPath)
-		stagedObject := repository.findIndexObject(filepath)
+		savedObject := repository.findSavedObject(filepath)
+		stagedObject := repository.findStagedObject(filepath)
 
 		if savedObject == nil && stagedObject == nil {
 			status.WorkingDir.UntrackedFilePaths = append(status.WorkingDir.UntrackedFilePaths, filepath)
