@@ -148,3 +148,100 @@ func TestAddNodeRemovalChangesNestedPath(t *testing.T) {
 	assert.Equal(t, dir.children["a"].dir.children["c"].dir.children["7.txt"].file, &File{filepath: "/home/project/a/c/7.txt"})
 	assert.Equal(t, dir.children["a"].dir.children["c"].dir.children["8.txt"].file, &File{filepath: "/home/project/a/c/8.txt", objectName: "newer-version"})
 }
+
+func TestFindNode(t *testing.T) {
+	dir := &Dir{
+		children: map[string]*Node{
+			"a.txt": &Node{
+				nodeType: FileType,
+				file: &File{
+					"/home/project/a.txt",
+					"object-a",
+				},
+			},
+			"b.txt": &Node{
+				nodeType: FileType,
+				file: &File{
+					"/home/project/b.txt",
+					"object-b",
+				},
+			},
+		},
+	}
+
+	assert.Equal(t, dir.findFile("a.txt"), &File{"/home/project/a.txt", "object-a"})
+	assert.Equal(t, dir.findFile("b.txt"), &File{"/home/project/b.txt", "object-b"})
+	assert.Nil(t, dir.findFile("c.txt"))
+}
+
+func TestFindNodeNestedPath(t *testing.T) {
+	dir := &Dir{
+		children: map[string]*Node{
+			"a.txt": &Node{
+				nodeType: FileType,
+				file: &File{
+					"/home/project/a.txt",
+					"object-a",
+				},
+			},
+			"b.txt": &Node{
+				nodeType: FileType,
+				file: &File{
+					"/home/project/b.txt",
+					"object-b",
+				},
+			},
+			"subdir": &Node{
+				nodeType: DirType,
+				dir: &Dir{
+					children: map[string]*Node{
+						"a.txt": &Node{
+							nodeType: FileType,
+							file: &File{
+								"/home/project/subdir/a.txt",
+								"object-subdir-a",
+							},
+						},
+						"c.txt": &Node{
+							nodeType: FileType,
+							file: &File{
+								"/home/project/subdir/c.txt",
+								"object-subdir-c",
+							},
+						},
+						"nested-subdir": &Node{
+							nodeType: DirType,
+							dir: &Dir{
+								children: map[string]*Node{
+									"b.txt": &Node{
+										nodeType: FileType,
+										file: &File{
+											"/home/project/subdir/nested-subdir/b.txt",
+											"object-subdir-nested-subdir-b",
+										},
+									},
+									"d.txt": &Node{
+										nodeType: FileType,
+										file: &File{
+											"/home/project/subdir/nested-subdir/d.txt",
+											"object-subdir-nested-subdir-d",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	assert.Equal(t, dir.findFile("a.txt"), &File{"/home/project/a.txt", "object-a"})
+	assert.Equal(t, dir.findFile("b.txt"), &File{"/home/project/b.txt", "object-b"})
+	assert.Nil(t, dir.findFile("subdir"))
+	assert.Equal(t, dir.findFile(fmt.Sprintf("subdir%sa.txt", PATH_SEPARATOR)), &File{"/home/project/subdir/a.txt", "object-subdir-a"})
+	assert.Equal(t, dir.findFile(fmt.Sprintf("subdir%sc.txt", PATH_SEPARATOR)), &File{"/home/project/subdir/c.txt", "object-subdir-c"})
+	assert.Nil(t, dir.findFile(fmt.Sprintf("subdir%snested-subdir", PATH_SEPARATOR)))
+	assert.Equal(t, dir.findFile(fmt.Sprintf("subdir%snested-subdir%sb.txt", PATH_SEPARATOR, PATH_SEPARATOR)), &File{"/home/project/subdir/nested-subdir/b.txt", "object-subdir-nested-subdir-b"})
+	assert.Equal(t, dir.findFile(fmt.Sprintf("subdir%snested-subdir%sd.txt", PATH_SEPARATOR, PATH_SEPARATOR)), &File{"/home/project/subdir/nested-subdir/d.txt", "object-subdir-nested-subdir-d"})
+}
