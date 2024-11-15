@@ -61,10 +61,10 @@ func (repository *Repository) writeObject(filepath string, file *os.File) *File 
 	errors.Check(err)
 	defer objectFile.Close()
 
-	gzipWriter := gzip.NewWriter(objectFile)
-	_, err = gzipWriter.Write(buffer.Bytes())
+	compressor := gzip.NewWriter(objectFile)
+	_, err = compressor.Write(buffer.Bytes())
 	errors.Check(err)
-	gzipWriter.Close()
+	compressor.Close()
 
 	return &File{filepath, objectName}
 }
