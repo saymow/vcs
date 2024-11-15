@@ -3,6 +3,7 @@ package repositories
 import (
 	"fmt"
 	path "path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -149,7 +150,7 @@ func TestAddNodeRemovalChangesNestedPath(t *testing.T) {
 	assert.Equal(t, dir.children["a"].dir.children["c"].dir.children["8.txt"].file, &File{filepath: "/home/project/a/c/8.txt", objectName: "newer-version"})
 }
 
-func TestFindNode(t *testing.T) {
+func TestFindFile(t *testing.T) {
 	dir := &Dir{
 		children: map[string]*Node{
 			"a.txt": &Node{
@@ -174,7 +175,7 @@ func TestFindNode(t *testing.T) {
 	assert.Nil(t, dir.findFile("c.txt"))
 }
 
-func TestFindNodeNestedPath(t *testing.T) {
+func TestFindFileNestedPath(t *testing.T) {
 	dir := &Dir{
 		children: map[string]*Node{
 			"a.txt": &Node{
@@ -244,4 +245,100 @@ func TestFindNodeNestedPath(t *testing.T) {
 	assert.Nil(t, dir.findFile(fmt.Sprintf("subdir%snested-subdir", PATH_SEPARATOR)))
 	assert.Equal(t, dir.findFile(fmt.Sprintf("subdir%snested-subdir%sb.txt", PATH_SEPARATOR, PATH_SEPARATOR)), &File{"/home/project/subdir/nested-subdir/b.txt", "object-subdir-nested-subdir-b"})
 	assert.Equal(t, dir.findFile(fmt.Sprintf("subdir%snested-subdir%sd.txt", PATH_SEPARATOR, PATH_SEPARATOR)), &File{"/home/project/subdir/nested-subdir/d.txt", "object-subdir-nested-subdir-d"})
+}
+
+func TestCollectFiles(t *testing.T) {
+	dir := &Dir{
+		children: map[string]*Node{
+			"a.txt": &Node{
+				nodeType: FileType,
+				file: &File{
+					"/home/project/a.txt",
+					"1",
+				},
+			},
+			"b.txt": &Node{
+				nodeType: FileType,
+				file: &File{
+					"/home/project/b.txt",
+					"2",
+				},
+			},
+			"subdir": &Node{
+				nodeType: DirType,
+				dir: &Dir{
+					children: map[string]*Node{
+						"a.txt": &Node{
+							nodeType: FileType,
+							file: &File{
+								"/home/project/subdir/a.txt",
+								"3",
+							},
+						},
+						"c.txt": &Node{
+							nodeType: FileType,
+							file: &File{
+								"/home/project/subdir/c.txt",
+								"4",
+							},
+						},
+						"nested-subdir": &Node{
+							nodeType: DirType,
+							dir: &Dir{
+								children: map[string]*Node{
+									"b.txt": &Node{
+										nodeType: FileType,
+										file: &File{
+											"/home/project/subdir/nested-subdir/b.txt",
+											"5",
+										},
+									},
+									"d.txt": &Node{
+										nodeType: FileType,
+										file: &File{
+											"/home/project/subdir/nested-subdir/d.txt",
+											"6",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	received := dir.collectFiles()
+
+	sort.Slice(received, func(i, j int) bool { return received[i].objectName < received[j].objectName })
+	assert.Equal(t,
+		received,
+		[]*File{
+			&File{
+				"/home/project/a.txt",
+				"1",
+			},
+			&File{
+				"/home/project/b.txt",
+				"2",
+			},
+			&File{
+				"/home/project/subdir/a.txt",
+				"3",
+			},
+			&File{
+				"/home/project/subdir/c.txt",
+				"4",
+			},
+			&File{
+				"/home/project/subdir/nested-subdir/b.txt",
+				"5",
+			},
+			&File{
+				"/home/project/subdir/nested-subdir/d.txt",
+				"6",
+			},
+		},
+	)
 }
