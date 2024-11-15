@@ -64,6 +64,7 @@ func (repository *Repository) writeObject(filepath string, file *os.File) *File 
 	gzipWriter := gzip.NewWriter(objectFile)
 	_, err = gzipWriter.Write(buffer.Bytes())
 	errors.Check(err)
+	gzipWriter.Close()
 
 	return &File{filepath, objectName}
 }
@@ -102,14 +103,14 @@ func (repository *Repository) IndexFile(filepath string) {
 			repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
 		}
 	} else if stagedChangeIdx != -1 {
-		if repository.index[stagedChangeIdx].changeType == Modified {
+		if repository.index[stagedChangeIdx].changeType == Modified &&
+			repository.index[stagedChangeIdx].modified.objectName != object.objectName {
 			// Remove change file object
 			repository.removeObject(repository.index[stagedChangeIdx].modified.objectName)
 		}
 
 		// Undo index existing change
 		repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
-
 		// Index change
 		repository.index = append(repository.index, &Change{changeType: Modified, modified: object})
 
