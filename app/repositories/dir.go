@@ -27,7 +27,10 @@ func (root *Dir) addNodeHelper(segments []string, change *Change) {
 	} else {
 		node = &Node{
 			nodeType: DirType,
-			dir:      &Dir{make(map[string]*Node)},
+			dir: &Dir{
+				path:     fp.Join(root.path, subdirName),
+				children: make(map[string]*Node),
+			},
 		}
 		root.children[subdirName] = node
 	}
@@ -41,31 +44,39 @@ func (root *Dir) addNode(path string, change *Change) {
 	root.addNodeHelper(segments, change)
 }
 
-func (root *Dir) findNodeHelper(segments []string) *File {
+func (root *Dir) findNodeHelper(segments []string) *Node {
 	if len(segments) == 1 {
 		node, ok := root.children[segments[0]]
-
-		if !ok || node.nodeType != FileType {
+		if !ok {
 			return nil
 		}
 
-		return node.file
+		return node
 	}
 
 	subdirName := segments[0]
 	node, ok := root.children[subdirName]
-
-	if !ok || node.nodeType != DirType {
+	if !ok {
 		return nil
 	}
 
 	return node.dir.findNodeHelper(segments[1:])
 }
 
-func (root *Dir) findFile(path string) *File {
+func (root *Dir) findNode(path string) *Node {
 	segments := strings.Split(path, string(fp.Separator))
 
 	return root.findNodeHelper(segments)
+}
+
+func (root *Dir) findFile(path string) *File {
+	node := root.findNode(path)
+
+	if node == nil || node.nodeType == DirType {
+		return nil
+	}
+
+	return node.file
 }
 
 func (root *Dir) collectFilesHelper(files *[]*File) {
@@ -78,10 +89,25 @@ func (root *Dir) collectFilesHelper(files *[]*File) {
 	}
 }
 
-func (root *Dir) collectFiles() []*File {
+func (root *Dir) collectAllFiles() []*File {
 	files := []*File{}
 
 	root.collectFilesHelper(&files)
+
+	return files
+}
+
+func (root *Dir) collectFiles(path string) []*File {
+	node := root.findNode(path)
+	files := []*File{}
+
+	if node != nil {
+		if node.nodeType == DirType {
+			files = node.dir.collectAllFiles()
+		} else {
+			files = append(files, node.file)
+		}
+	}
 
 	return files
 }

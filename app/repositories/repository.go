@@ -11,7 +11,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	path "path/filepath"
+	Path "path/filepath"
 	"saymow/version-manager/app/pkg/collections"
 	"saymow/version-manager/app/pkg/errors"
 	"slices"
@@ -66,7 +66,7 @@ func (repository *Repository) writeObject(filepath string, file *os.File) *File 
 	hash := hasher.Sum(nil)
 
 	objectName := hex.EncodeToString(hash)
-	objectFile, err := os.Create(path.Join(repository.root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, objectName))
+	objectFile, err := os.Create(Path.Join(repository.root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, objectName))
 	errors.Check(err)
 	defer objectFile.Close()
 
@@ -79,13 +79,13 @@ func (repository *Repository) writeObject(filepath string, file *os.File) *File 
 }
 
 func (repository *Repository) removeObject(name string) {
-	err := os.Remove(path.Join(repository.root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, name))
+	err := os.Remove(Path.Join(repository.root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, name))
 	errors.Check(err)
 }
 
 func (repository *Repository) IndexFile(filepath string) {
-	if !path.IsAbs(filepath) {
-		filepath = path.Join(repository.root, filepath)
+	if !Path.IsAbs(filepath) {
+		filepath = Path.Join(repository.root, filepath)
 	}
 	if !strings.HasPrefix(filepath, repository.root) {
 		log.Fatal("Invalid file path.")
@@ -130,8 +130,8 @@ func (repository *Repository) IndexFile(filepath string) {
 }
 
 func (repository *Repository) RemoveFile(filepath string) {
-	if !path.IsAbs(filepath) {
-		filepath = path.Join(repository.root, filepath)
+	if !Path.IsAbs(filepath) {
+		filepath = Path.Join(repository.root, filepath)
 	}
 	if !strings.HasPrefix(filepath, repository.root) {
 		log.Fatal("Invalid file path.")
@@ -164,7 +164,7 @@ func (repository *Repository) RemoveFile(filepath string) {
 }
 
 func (repository *Repository) SaveIndex() {
-	file, err := os.OpenFile(path.Join(repository.root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
+	file, err := os.OpenFile(Path.Join(repository.root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
 	errors.Check(err)
 
 	_, err = file.Write([]byte("Tracked files:\n\n"))
@@ -232,7 +232,7 @@ func (repository *Repository) writeSave(save *CheckPoint) string {
 
 	saveName := hex.EncodeToString(hash)
 
-	file, err := os.Create(path.Join(repository.root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
+	file, err := os.Create(Path.Join(repository.root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
 	errors.Check(err)
 	defer file.Close()
 
@@ -248,7 +248,7 @@ func (repository *Repository) clearIndex() {
 }
 
 func (repository *Repository) writeHead(name string) {
-	file, err := os.OpenFile(path.Join(repository.root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
+	file, err := os.OpenFile(Path.Join(repository.root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
 	errors.Check(err)
 
 	_, err = file.Write([]byte(name))
@@ -285,7 +285,7 @@ func (repository *Repository) GetStatus() *Status {
 	seenPaths := set.New()
 	trackedPaths := set.New()
 
-	for _, file := range repository.dir.collectFiles() {
+	for _, file := range repository.dir.collectAllFiles() {
 		trackedPaths.Insert(file.filepath)
 	}
 
@@ -297,9 +297,9 @@ func (repository *Repository) GetStatus() *Status {
 		}
 	}
 
-	path.Walk(repository.root, func(filepath string, info fs.FileInfo, err error) error {
+	Path.Walk(repository.root, func(filepath string, info fs.FileInfo, err error) error {
 		errors.Check(err)
-		if repository.root == filepath || strings.HasPrefix(filepath, path.Join(repository.root, REPOSITORY_FOLDER_NAME)) {
+		if repository.root == filepath || strings.HasPrefix(filepath, Path.Join(repository.root, REPOSITORY_FOLDER_NAME)) {
 			return nil
 		}
 		if info.IsDir() {
@@ -388,8 +388,7 @@ func readCheckpoint(file *os.File) *CheckPoint {
 	checkpoint.parent = scanner.Text()
 
 	scanner.Scan()
-	text := scanner.Text()
-	createdAt, err := time.Parse(time.Layout, text)
+	createdAt, err := time.Parse(time.Layout, scanner.Text())
 	errors.Check(err)
 	checkpoint.createdAt = createdAt
 
@@ -434,10 +433,6 @@ func readCheckpoint(file *os.File) *CheckPoint {
 }
 
 func (repository *Repository) getSave(ref string) *Save {
-	if ref == "" {
-		return nil
-	}
-
 	save := &Save{}
 	var checkpointId string
 
@@ -447,7 +442,11 @@ func (repository *Repository) getSave(ref string) *Save {
 		checkpointId = ref
 	}
 
-	checkpointFile, err := os.Open(path.Join(repository.root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
+	if ref == "" {
+		return nil
+	}
+
+	checkpointFile, err := os.Open(Path.Join(repository.root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -461,19 +460,115 @@ func (repository *Repository) getSave(ref string) *Save {
 
 	for save.checkpoints[len(save.checkpoints)-1].parent != "" {
 		checkpointId = save.checkpoints[len(save.checkpoints)-1].parent
-		checkpointFile, err = os.Open(path.Join(repository.root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
+		checkpointFile, err = os.Open(Path.Join(repository.root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
 		errors.Check(err)
 		save.checkpoints = append(save.checkpoints, readCheckpoint(checkpointFile))
 		checkpointFile.Close()
 	}
 
+	slices.Reverse(save.checkpoints)
+
 	return save
+}
+
+func buildDirFromSave(root string, save *Save) *Dir {
+	dir := &Dir{path: root, children: map[string]*Node{}}
+
+	for _, checkpoint := range save.checkpoints {
+		for _, change := range checkpoint.changes {
+			var normalizedPath string
+
+			if change.changeType == Modified {
+				normalizedPath = change.modified.filepath[len(root)+1:]
+			} else {
+				normalizedPath = change.removal.filepath[len(root)+1:]
+			}
+
+			dir.addNode(normalizedPath, change)
+		}
+	}
+
+	return dir
+}
+
+func (repository *Repository) applyFile(file *File) {
+	sourceFile, err := os.OpenFile(file.filepath, os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			errors.Error(err.Error())
+		}
+
+		sourceFile, err = os.Create(file.filepath)
+		errors.Check(err)
+	}
+
+	errors.Check(err)
+	defer sourceFile.Close()
+
+	objectFile, err := os.Open(Path.Join(repository.root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, file.objectName))
+	errors.Check(err)
+	defer objectFile.Close()
+
+	decompressor, err := gzip.NewReader(objectFile)
+	errors.Check(err)
+
+	buffer := make([]byte, 256)
+
+	for {
+		n, err := decompressor.Read(buffer)
+
+		if err != nil && err != io.EOF {
+			errors.Error(err.Error())
+		}
+		if n == 0 {
+			break
+		}
+
+		_, err = sourceFile.Write(buffer[:n])
+		errors.Check(err)
+	}
 }
 
 func (repository *Repository) Restore(ref string, path string) error {
 	save := repository.getSave(ref)
 	if save == nil {
 		return &ValidationError{fmt.Sprintf("\"%s\" is an invalid ref.", ref)}
+	}
+
+	dir := buildDirFromSave(repository.root, save)
+	files := collections.ToMap(dir.collectFiles(path), func(file *File, _ int) string {
+		return file.filepath
+	})
+	filesRemovedFromIndex := []*File{}
+
+	if ref == "HEAD" {
+		// index files have higher priority over tree files to be restored
+
+		for idx, change := range slices.Clone(repository.index) {
+			if change.changeType == Modified {
+				if _, ok := files[change.modified.filepath]; ok {
+					// should override history file and remove modification from the index
+
+					files[change.modified.filepath] = change.modified
+					filesRemovedFromIndex = append(filesRemovedFromIndex, change.modified)
+					repository.index = slices.Delete(repository.index, idx, idx+1)
+				}
+			} else {
+				if _, ok := files[change.removal.filepath]; ok {
+					// should remove removal change from the index
+
+					repository.index = slices.Delete(repository.index, idx, idx+1)
+				}
+			}
+		}
+	}
+
+	for _, file := range files {
+		repository.applyFile(file)
+	}
+
+	for _, fileRemoved := range filesRemovedFromIndex {
+		repository.removeObject(fileRemoved.objectName)
 	}
 
 	return nil

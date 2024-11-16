@@ -13,7 +13,8 @@ const PATH_SEPARATOR = string(path.Separator)
 
 func TestAddNode(t *testing.T) {
 	dir := &Dir{
-		make(map[string]*Node),
+		path:     "/home/project",
+		children: make(map[string]*Node),
 	}
 
 	dir.addNode("a.txt", &Change{changeType: Modified, modified: &File{filepath: "/home/project/a.txt"}})
@@ -24,7 +25,8 @@ func TestAddNode(t *testing.T) {
 
 func TestAddNodeNestedPath(t *testing.T) {
 	dir := &Dir{
-		make(map[string]*Node),
+		path:     "/home/project",
+		children: make(map[string]*Node),
 	}
 
 	dir.addNode("1.txt", &Change{changeType: Modified, modified: &File{filepath: "/home/project/1.txt"}})
@@ -54,7 +56,8 @@ func TestAddNodeNestedPath(t *testing.T) {
 
 func TestAddNodeRemovalChanges(t *testing.T) {
 	dir := &Dir{
-		make(map[string]*Node),
+		path:     "/home/project",
+		children: make(map[string]*Node),
 	}
 
 	dir.addNode("a.txt", &Change{changeType: Modified, modified: &File{filepath: "/home/project/a.txt"}})
@@ -68,7 +71,8 @@ func TestAddNodeRemovalChanges(t *testing.T) {
 
 func TestAddNodeOverrideRemovalChanges(t *testing.T) {
 	dir := &Dir{
-		make(map[string]*Node),
+		path:     "/home/project",
+		children: make(map[string]*Node),
 	}
 
 	dir.addNode("a.txt", &Change{changeType: Modified, modified: &File{filepath: "/home/project/a.txt", objectName: "old-version"}})
@@ -81,7 +85,8 @@ func TestAddNodeOverrideRemovalChanges(t *testing.T) {
 
 func TestAddNodeRemovalChangesNestedPath(t *testing.T) {
 	dir := &Dir{
-		make(map[string]*Node),
+		path:     "/home/project",
+		children: make(map[string]*Node),
 	}
 
 	dir.addNode("1.txt", &Change{changeType: Modified, modified: &File{filepath: "/home/project/1.txt"}})
@@ -309,7 +314,7 @@ func TestCollectFiles(t *testing.T) {
 		},
 	}
 
-	received := dir.collectFiles()
+	received := dir.collectAllFiles()
 
 	sort.Slice(received, func(i, j int) bool { return received[i].objectName < received[j].objectName })
 	assert.Equal(t,

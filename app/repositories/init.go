@@ -60,6 +60,7 @@ type Node struct {
 }
 
 type Dir struct {
+	path     string
 	children map[string]*Node
 }
 
@@ -156,7 +157,7 @@ func readHead(file *os.File) string {
 }
 
 func buildDir(root string, head string) Dir {
-	dir := Dir{make(map[string]*Node)}
+	dir := Dir{path: root, children: make(map[string]*Node)}
 	changes := []Change{}
 	saveName := head
 
