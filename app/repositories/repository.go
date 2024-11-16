@@ -158,14 +158,14 @@ func (repository *Repository) SaveIndex() {
 	file, err := os.OpenFile(path.Join(repository.root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
 	errors.Check(err)
 
-	_, err = file.Write([]byte("Tracked files:\r\n\r\n"))
+	_, err = file.Write([]byte("Tracked files:\n\n"))
 	errors.Check(err)
 
 	for _, change := range repository.index {
 		if change.changeType == Modified {
-			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\r\n%s\r\n", change.modified.filepath, MODIFIED_CHANGE, change.modified.objectName)))
+			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.modified.filepath, MODIFIED_CHANGE, change.modified.objectName)))
 		} else {
-			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\r\n", change.removal.filepath, REMOVAL_CHANGE)))
+			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n", change.removal.filepath, REMOVAL_CHANGE)))
 		}
 		errors.Check(err)
 	}
