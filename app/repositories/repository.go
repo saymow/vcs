@@ -128,24 +128,22 @@ func (repository *Repository) RemoveFile(filepath string) {
 		log.Fatal("Invalid file path.")
 	}
 
+	// Remove from working dir
+	err := os.Remove(filepath)
+	if err != nil && !os.IsNotExist(err) {
+		errors.Error(err.Error())
+	}
+
 	stagedChangeIdx := repository.findStagedChangeIdx(filepath)
 	savedObject := repository.findSavedObject(filepath)
 
-	if stagedChangeIdx == -1 && savedObject == nil {
-		// Nothing to be removed
-		return
-	}
-	if stagedChangeIdx != -1 && repository.index[stagedChangeIdx].changeType == Removal {
-		// Index entry is already meant for removal
-		return
-	}
-
-	// Remove from working dir
-	err := os.Remove(filepath)
-	errors.Check(err)
-
 	if stagedChangeIdx != -1 {
-		// Remove from the index
+		if repository.index[stagedChangeIdx].changeType == Removal {
+			// Index entry is already meant for removal
+			return
+		}
+
+		// Remove existing change from the index
 		repository.removeObject(repository.index[stagedChangeIdx].modified.objectName)
 		repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
 	}
