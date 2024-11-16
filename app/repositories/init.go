@@ -35,6 +35,7 @@ type Change struct {
 }
 
 type Save struct {
+	id        string
 	message   string
 	createdAt time.Time
 	parent    string

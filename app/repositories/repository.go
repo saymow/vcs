@@ -183,9 +183,9 @@ func (repository *Repository) CreateSave(message string) *Save {
 		createdAt: time.Now(),
 	}
 
-	name := repository.writeSave(&save)
+	save.id = repository.writeSave(&save)
 	repository.clearIndex()
-	repository.writeHead(name)
+	repository.writeHead(save.id)
 
 	return &save
 }
@@ -193,23 +193,23 @@ func (repository *Repository) CreateSave(message string) *Save {
 func (repository *Repository) writeSave(save *Save) string {
 	var stringBuilder strings.Builder
 
-	_, err := stringBuilder.Write([]byte(fmt.Sprintf("%s\r\n", save.message)))
+	_, err := stringBuilder.Write([]byte(fmt.Sprintf("%s\n", save.message)))
 	errors.Check(err)
 
-	_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\r\n", save.parent)))
+	_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\n", save.parent)))
 	errors.Check(err)
 
-	_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\r\n\r\n", save.createdAt.Format(time.Layout))))
+	_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\n\n", save.createdAt.Format(time.Layout))))
 	errors.Check(err)
 
-	_, err = stringBuilder.Write([]byte("Please do not edit the lines below.\r\n\r\n\r\nFiles:\r\n\r\n"))
+	_, err = stringBuilder.Write([]byte("Please do not edit the lines below.\n\n\nFiles:\n\n"))
 	errors.Check(err)
 
 	for _, change := range save.changes {
 		if change.changeType == Modified {
-			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\r\n%s\r\n", change.modified.filepath, MODIFIED_CHANGE, change.modified.objectName)))
+			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.modified.filepath, MODIFIED_CHANGE, change.modified.objectName)))
 		} else {
-			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\r\n", change.removal.filepath, REMOVAL_CHANGE)))
+			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n", change.removal.filepath, REMOVAL_CHANGE)))
 		}
 		errors.Check(err)
 	}
