@@ -2,7 +2,10 @@ package repositories
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"saymow/version-manager/app/pkg/errors"
+	"strings"
 	"testing"
 
 	"gotest.tools/v3/fs"
@@ -124,4 +127,29 @@ func fixtureFileExists(filepath string) bool {
 	}
 
 	return !os.IsNotExist(err)
+}
+
+func fixtureReadFile(filepath string) string {
+	file, err := os.Open(filepath)
+	errors.Check(err)
+	defer file.Close()
+
+	var str strings.Builder
+	buffer := make([]byte, 256)
+
+	for {
+		n, err := file.Read(buffer)
+
+		if err != nil && err != io.EOF {
+			errors.Error(err.Error())
+		}
+		if n == 0 {
+			break
+		}
+
+		_, err = str.WriteString(string(buffer[:n]))
+		errors.Check(err)
+	}
+
+	return str.String()
 }

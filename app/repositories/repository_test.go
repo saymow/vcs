@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	path "path/filepath"
 	"saymow/version-manager/app/pkg/collections"
@@ -315,5 +316,91 @@ func TestRemoveFile(t *testing.T) {
 			}),
 			-1,
 		)
+	}
+}
+
+func TestSaveIndex(t *testing.T) {
+	dir, repository := fixtureGetBaseProject(t)
+	defer dir.Remove()
+
+	// Check empty index
+	{
+		repository.SaveIndex()
+
+		fileContent := fixtureReadFile(dir.Join(REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
+
+		assert.Equal(t, fileContent, "Tracked files:\n\n")
+	}
+
+	// Check non empty index
+	{
+		repository.index = append(
+			repository.index,
+			&Change{changeType: Modified, modified: &File{filepath: dir.Join("1.txt"), objectName: "1.txt-object"}},
+			&Change{changeType: Modified, modified: &File{filepath: dir.Join("a", "b", "6.txt"), objectName: "6.txt-object"}},
+			&Change{changeType: Removal, removal: &FileRemoval{filepath: dir.Join("a", "b", "5.txt")}},
+			&Change{changeType: Modified, modified: &File{filepath: dir.Join("a", "b", "7.txt"), objectName: "7.txt-object"}},
+			&Change{changeType: Modified, modified: &File{filepath: dir.Join("a", "b", "c", "8.txt"), objectName: "8.txt-object"}},
+			&Change{changeType: Removal, removal: &FileRemoval{filepath: dir.Join("a", "b", "c", "9.txt")}},
+		)
+
+		repository.SaveIndex()
+
+		received := fixtureReadFile(dir.Join(REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
+		expected := `Tracked files:
+
+%s	(modified)
+1.txt-object
+%s	(modified)
+6.txt-object
+%s	(removed)
+%s	(modified)
+7.txt-object
+%s	(modified)
+8.txt-object
+%s	(removed)
+`
+
+		assert.Equal(
+			t,
+			received,
+			fmt.Sprintf(
+				expected,
+				dir.Join("1.txt"),
+				dir.Join("a", "b", "6.txt"),
+				dir.Join("a", "b", "5.txt"),
+				dir.Join("a", "b", "7.txt"),
+				dir.Join("a", "b", "c", "8.txt"),
+				dir.Join("a", "b", "c", "9.txt"),
+			),
+		)
+
+		// Check index updates
+		{
+			repository.index = []*Change{repository.index[0], repository.index[2], repository.index[4]}
+
+			repository.SaveIndex()
+
+			received := fixtureReadFile(dir.Join(REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
+			expected := `Tracked files:
+
+%s	(modified)
+1.txt-object
+%s	(removed)
+%s	(modified)
+8.txt-object
+`
+
+			assert.Equal(
+				t,
+				received,
+				fmt.Sprintf(
+					expected,
+					dir.Join("1.txt"),
+					dir.Join("a", "b", "5.txt"),
+					dir.Join("a", "b", "c", "8.txt"),
+				),
+			)
+		}
 	}
 }
