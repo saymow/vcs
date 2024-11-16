@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
+	path "path/filepath"
 	"saymow/version-manager/app/pkg/collections"
 	"saymow/version-manager/app/pkg/errors"
 	"testing"
@@ -213,5 +214,106 @@ func TestIndexFileComplexCases(t *testing.T) {
 			testifyAssert.Equal(t, changeIdx, -1)
 			testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, change.modified.objectName)))
 		}
+	}
+}
+
+func TestRemoveFile(t *testing.T) {
+	dir, repository := fixtureGetCustomProject(t, fixtureMakeBasicRepositoryFs)
+	defer dir.Remove()
+
+	// Check it should only remove from working directory if file is not being tracked
+	{
+		// Test indempontence along
+		repository.RemoveFile(path.Join("a", "5.txt"))
+		repository.RemoveFile(path.Join("a", "5.txt"))
+		repository.RemoveFile(path.Join("a", "5.txt"))
+
+		changeIdx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
+			return change.changeType == Removal && change.removal.filepath == dir.Join("a", "5.txt")
+		})
+		testifyAssert.Equal(t, changeIdx, -1)
+		testifyAssert.False(t, fixtureFileExists(dir.Join("a", "5.txt")))
+	}
+
+	// Check remove file base case (existing only on the tree and working dir)
+	{
+		// Test indempontence along
+		repository.RemoveFile("1.txt")
+		repository.RemoveFile("1.txt")
+		repository.RemoveFile("1.txt")
+
+		changeIdx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
+			return change.changeType == Removal && change.removal.filepath == dir.Join("1.txt")
+		})
+		testifyAssert.NotEqual(t, changeIdx, -1)
+		testifyAssert.False(t, fixtureFileExists(dir.Join("1.txt")))
+	}
+
+	// Check remove file base case (existing only on the index and working dir)
+	{
+		repository.IndexFile(path.Join("a", "4.txt"))
+
+		idx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
+			return change.changeType == Modified && change.modified.filepath == dir.Join("a", "4.txt")
+		})
+
+		testifyAssert.NotEqual(t, idx, -1)
+		modificationChange := repository.index[idx]
+
+		// Test indempontence along
+		repository.RemoveFile(path.Join("a", "4.txt"))
+		repository.RemoveFile(path.Join("a", "4.txt"))
+		repository.RemoveFile(path.Join("a", "4.txt"))
+
+		// Check modification change is removed from the index
+		testifyAssert.Equal(
+			t,
+			collections.FindIndex(repository.index, func(change *Change, _ int) bool {
+				return change.changeType == Modified && change.modified.filepath == dir.Join("a", "4.txt")
+			}),
+			-1,
+		)
+		// Check file is deleted
+		testifyAssert.False(t, fixtureFileExists(dir.Join("a", "4.txt")))
+		// Check object is deleted
+		testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, modificationChange.modified.objectName)))
+	}
+
+	// Check remove file existing on the index, working dir and tree
+	{
+		repository.IndexFile(path.Join("3.txt"))
+
+		idx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
+			return change.changeType == Modified && change.modified.filepath == dir.Join("3.txt")
+		})
+
+		testifyAssert.NotEqual(t, idx, -1)
+		modificationChange := repository.index[idx]
+
+		// Test indempontence along
+		repository.RemoveFile(path.Join("3.txt"))
+		repository.RemoveFile(path.Join("3.txt"))
+		repository.RemoveFile(path.Join("3.txt"))
+
+		// Check modification change is removed from the index
+		testifyAssert.Equal(
+			t,
+			collections.FindIndex(repository.index, func(change *Change, _ int) bool {
+				return change.changeType == Modified && change.modified.filepath == dir.Join("3.txt")
+			}),
+			-1,
+		)
+		// Check file is deleted
+		testifyAssert.False(t, fixtureFileExists(dir.Join("3.txt")))
+		// Check object is deleted
+		testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, modificationChange.modified.objectName)))
+		// Check removal change is added to the index
+		testifyAssert.NotEqual(
+			t,
+			collections.FindIndex(repository.index, func(change *Change, _ int) bool {
+				return change.changeType == Removal && change.removal.filepath == dir.Join("3.txt")
+			}),
+			-1,
+		)
 	}
 }
