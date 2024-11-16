@@ -580,15 +580,6 @@ Files:
 	)
 }
 
-//	Staged struct {
-//		CreatedFilesPaths []string
-//		ModifiedFilePaths []string
-//		RemovedFilePaths  []string
-//
-//	WorkingDir struct {
-//		ModifiedFilePaths  []string
-//		UntrackedFilePaths []string
-//		RemovedFilePaths   []string
 func TestGetStatus(t *testing.T) {
 	dir, repository := fixtureGetBaseProject(t)
 	defer dir.Remove()
@@ -626,4 +617,22 @@ func TestGetStatus(t *testing.T) {
 		status.WorkingDir.UntrackedFilePaths,
 		[]string{dir.Join("3.txt"), dir.Join("a", "5.txt"), dir.Join("a", "b", "7.txt")},
 	)
+}
+
+func TestRestoreInvalidRef(t *testing.T) {
+	dir, repository := fixtureGetCustomProject(t, fixtureMakeBasicRepositoryFs)
+	defer dir.Remove()
+
+	testifyAssert.EqualError(t, repository.Restore("", "."), "Validation Error: \"\" is an invalid ref.")
+	testifyAssert.EqualError(t, repository.Restore("def invalid", "."), "Validation Error: \"def invalid\" is an invalid ref.")
+	testifyAssert.EqualError(t, repository.Restore("___", "."), "Validation Error: \"___\" is an invalid ref.")
+}
+
+func TestRestoreSingleFile(t *testing.T) {
+	dir, repository := fixtureGetCustomProject(t, fixtureMakeBasicRepositoryFs)
+	defer dir.Remove()
+
+	testifyAssert.EqualError(t, repository.Restore("", "."), "Validation Error: \"\" is an invalid ref.")
+	testifyAssert.EqualError(t, repository.Restore("def invalid", "."), "Validation Error: \"def invalid\" is an invalid ref.")
+	testifyAssert.EqualError(t, repository.Restore("___", "."), "Validation Error: \"___\" is an invalid ref.")
 }
