@@ -11,6 +11,7 @@ import (
 	"saymow/version-manager/app/pkg/collections"
 	"saymow/version-manager/app/pkg/errors"
 	"testing"
+	"time"
 
 	testifyAssert "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
@@ -403,4 +404,178 @@ func TestSaveIndex(t *testing.T) {
 			)
 		}
 	}
+}
+
+func TestCreateSave(t *testing.T) {
+	dir, _ := fixtureGetBaseProject(t)
+	defer dir.Remove()
+
+	// Check initial save
+
+	indexFilepath := dir.Join(REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME)
+	index := fmt.Sprintf(`Tracked files:
+	
+%s	(modified)
+1.txt-object
+%s	(modified)
+4.txt-object
+%s	(modified)
+6.txt-object
+`, dir.Join("1.txt"),
+		dir.Join("a", "4.txt"),
+		dir.Join("a", "b", "6.txt"),
+	)
+	fixtureWriteFile(indexFilepath, []byte(index))
+
+	repository := GetRepository(dir.Path())
+	firstSave := repository.CreateSave("first save")
+	expectedFirstSaveFileContent := fmt.Sprintf(`%s
+
+%s
+
+Please do not edit the lines below.
+
+
+Files:
+
+%s	(modified)
+%s
+%s	(modified)
+%s
+%s	(modified)
+%s
+`,
+		firstSave.message,
+		firstSave.createdAt.Format(time.Layout),
+		firstSave.changes[0].modified.filepath,
+		firstSave.changes[0].modified.objectName,
+		firstSave.changes[1].modified.filepath,
+		firstSave.changes[1].modified.objectName,
+		firstSave.changes[2].modified.filepath,
+		firstSave.changes[2].modified.objectName,
+	)
+
+	testifyAssert.Equal(t, firstSave.message, "first save")
+	testifyAssert.Equal(t, firstSave.parent, "")
+	testifyAssert.EqualValues(
+		t,
+		firstSave.changes,
+		[]*Change{
+			{
+				changeType: Modified,
+				modified: &File{
+					filepath:   dir.Join("1.txt"),
+					objectName: "1.txt-object",
+				},
+			},
+			{
+				changeType: Modified,
+				modified: &File{
+					filepath:   dir.Join("a", "4.txt"),
+					objectName: "4.txt-object",
+				},
+			},
+			{
+				changeType: Modified,
+				modified: &File{
+					filepath:   dir.Join("a", "b", "6.txt"),
+					objectName: "6.txt-object",
+				},
+			},
+		},
+	)
+	assert.Assert(
+		t,
+		fs.Equal(
+			dir.Join(REPOSITORY_FOLDER_NAME),
+			fs.Expected(
+				t,
+				fs.WithFile("head", firstSave.id),
+				fs.WithFile("index", "Tracked files:\n\n"),
+				fs.WithDir("saves",
+					fs.WithFile(firstSave.id, expectedFirstSaveFileContent),
+				),
+				fs.WithDir("objects"),
+			),
+		),
+	)
+
+	// Check second save
+
+	index = fmt.Sprintf(`Tracked files:
+	
+%s	(removed)
+%s	(removed)
+%s	(modified)
+8.txt-object
+`, dir.Join("1.txt"),
+		dir.Join("a", "4.txt"),
+		dir.Join("a", "b", "c", "8.txt"),
+	)
+	fixtureWriteFile(indexFilepath, []byte(index))
+
+	repository = GetRepository(dir.Path())
+	secondSave := repository.CreateSave("second save")
+	expectedSecondSaveFileContent := fmt.Sprintf(`%s
+%s
+%s
+
+Please do not edit the lines below.
+
+
+Files:
+
+%s	(removed)
+%s	(removed)
+%s	(modified)
+%s
+`,
+		secondSave.message,
+		secondSave.parent,
+		secondSave.createdAt.Format(time.Layout),
+		secondSave.changes[0].removal.filepath,
+		secondSave.changes[1].removal.filepath,
+		secondSave.changes[2].modified.filepath,
+		secondSave.changes[2].modified.objectName,
+	)
+
+	testifyAssert.Equal(t, secondSave.message, "second save")
+	testifyAssert.Equal(t, secondSave.parent, firstSave.id)
+	testifyAssert.EqualValues(
+		t,
+		secondSave.changes,
+		[]*Change{
+			{
+				changeType: Removal,
+				removal:    &FileRemoval{dir.Join("1.txt")},
+			},
+			{
+				changeType: Removal,
+				removal:    &FileRemoval{dir.Join("a", "4.txt")},
+			},
+			{
+				changeType: Modified,
+				modified: &File{
+					filepath:   dir.Join("a", "b", "c", "8.txt"),
+					objectName: "8.txt-object",
+				},
+			},
+		},
+	)
+	assert.Assert(
+		t,
+		fs.Equal(
+			dir.Join(REPOSITORY_FOLDER_NAME),
+			fs.Expected(
+				t,
+				fs.WithFile("head", secondSave.id),
+				fs.WithFile("index", "Tracked files:\n\n"),
+				fs.WithDir("saves",
+					fs.WithFile(firstSave.id, expectedFirstSaveFileContent),
+					fs.WithFile(secondSave.id, expectedSecondSaveFileContent),
+				),
+				fs.WithDir("objects"),
+			),
+		),
+	)
 }

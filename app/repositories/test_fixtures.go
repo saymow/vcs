@@ -153,3 +153,12 @@ func fixtureReadFile(filepath string) string {
 
 	return str.String()
 }
+
+func fixtureWriteFile(filepath string, content []byte) {
+	file, err := os.OpenFile(filepath, os.O_WRONLY|os.O_TRUNC, 0644)
+	errors.Check(err)
+	defer file.Close()
+
+	_, err = file.Write(content)
+	errors.Check(err)
+}
