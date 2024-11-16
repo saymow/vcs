@@ -97,7 +97,7 @@ func (repository *Repository) IndexFile(filepath string) {
 
 	object := repository.writeObject(filepath, file)
 	stagedChangeIdx := repository.findStagedChangeIdx(filepath)
-	savedObject := repository.findSavedObject(filepath)
+	savedObject := repository.findSavedFile(filepath)
 
 	if savedObject != nil && savedObject.objectName == object.objectName {
 		// No changes at all
@@ -144,7 +144,7 @@ func (repository *Repository) RemoveFile(filepath string) {
 	}
 
 	stagedChangeIdx := repository.findStagedChangeIdx(filepath)
-	savedObject := repository.findSavedObject(filepath)
+	savedObject := repository.findSavedFile(filepath)
 
 	if stagedChangeIdx != -1 {
 		if repository.index[stagedChangeIdx].changeType == Removal {
@@ -275,9 +275,15 @@ func (repository *Repository) findStagedChange(filepath string) *Change {
 	return repository.index[idx]
 }
 
-func (repository *Repository) findSavedObject(filepath string) *File {
+func (repository *Repository) findSavedFile(filepath string) *File {
 	normalizedPath := filepath[len(repository.root)+1:]
-	return repository.dir.findFile(normalizedPath)
+	node := repository.dir.findNode(normalizedPath)
+
+	if node == nil || node.nodeType != FileType {
+		return nil
+	}
+
+	return node.file
 }
 
 func (repository *Repository) GetStatus() *Status {
@@ -308,10 +314,10 @@ func (repository *Repository) GetStatus() *Status {
 
 		seenPaths.Insert(filepath)
 
-		savedObject := repository.findSavedObject(filepath)
+		savedFile := repository.findSavedFile(filepath)
 		stagedChange := repository.findStagedChange(filepath)
 
-		if savedObject == nil && stagedChange == nil {
+		if savedFile == nil && stagedChange == nil {
 			status.WorkingDir.UntrackedFilePaths = append(status.WorkingDir.UntrackedFilePaths, filepath)
 			return nil
 		}
@@ -343,7 +349,7 @@ func (repository *Repository) GetStatus() *Status {
 
 		if stagedChange != nil {
 			if stagedChange.changeType == Modified {
-				if savedObject == nil {
+				if savedFile == nil {
 					status.Staged.CreatedFilesPaths = append(status.Staged.CreatedFilesPaths, filepath)
 				} else {
 					status.Staged.ModifiedFilePaths = append(status.Staged.ModifiedFilePaths, filepath)
@@ -356,7 +362,7 @@ func (repository *Repository) GetStatus() *Status {
 				status.Staged.RemovedFilePaths = append(status.Staged.RemovedFilePaths, stagedChange.removal.filepath)
 			}
 		} else {
-			if savedObject.objectName != fileHash {
+			if savedFile.objectName != fileHash {
 				status.WorkingDir.ModifiedFilePaths = append(status.WorkingDir.ModifiedFilePaths, filepath)
 			}
 		}

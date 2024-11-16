@@ -64,19 +64,14 @@ func (root *Dir) findNodeHelper(segments []string) *Node {
 }
 
 func (root *Dir) findNode(path string) *Node {
+	if path == "" || path == string(fp.Separator) {
+		// edge case to handle all paths for this dir
+		return &Node{nodeType: DirType, dir: root}
+	}
+
 	segments := strings.Split(path, string(fp.Separator))
 
 	return root.findNodeHelper(segments)
-}
-
-func (root *Dir) findFile(path string) *File {
-	node := root.findNode(path)
-
-	if node == nil || node.nodeType == DirType {
-		return nil
-	}
-
-	return node.file
 }
 
 func (root *Dir) collectFilesHelper(files *[]*File) {
