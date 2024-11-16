@@ -628,11 +628,72 @@ func TestRestoreInvalidRef(t *testing.T) {
 	testifyAssert.EqualError(t, repository.Restore("___", "."), "Validation Error: \"___\" is an invalid ref.")
 }
 
-func TestRestoreSingleFile(t *testing.T) {
-	dir, repository := fixtureGetCustomProject(t, fixtureMakeBasicRepositoryFs)
+func TestRestoreHeadSingleFile(t *testing.T) {
+	dir, repository := fixtureGetBaseProject(t)
 	defer dir.Remove()
 
-	testifyAssert.EqualError(t, repository.Restore("", "."), "Validation Error: \"\" is an invalid ref.")
-	testifyAssert.EqualError(t, repository.Restore("def invalid", "."), "Validation Error: \"def invalid\" is an invalid ref.")
-	testifyAssert.EqualError(t, repository.Restore("___", "."), "Validation Error: \"___\" is an invalid ref.")
+	// Check for file changed
+	{
+		// Setup
+
+		fixtureWriteFile(dir.Join("1.txt"), []byte("the original content."))
+		repository.IndexFile("1.txt")
+		repository.SaveIndex()
+		repository.CreateSave("initial save")
+
+		repository = GetRepository(dir.Path())
+		fixtureWriteFile(dir.Join("1.txt"), []byte("not the original content. Saved on the index"))
+		repository.IndexFile("1.txt")
+		repository.SaveIndex()
+
+		fixtureWriteFile(dir.Join("1.txt"), []byte("someone messed up!"))
+
+		// Test
+
+		// 1) Ensure index priority (and remove files from it)
+		repository = GetRepository(dir.Path())
+		testifyAssert.Equal(t, len(repository.index), 1)
+		testifyAssert.Equal(t, repository.index[0].modified.filepath, dir.Join("1.txt"))
+		repository.Restore("HEAD", "1.txt")
+		repository.SaveIndex()
+
+		testifyAssert.Equal(t, len(repository.index), 0)
+		testifyAssert.Equal(t, fixtureReadFile(dir.Join("1.txt")), "not the original content. Saved on the index")
+
+		// 1) When no index files, use history file
+		repository = GetRepository(dir.Path())
+		// should be indempontent now
+		repository.Restore("HEAD", "1.txt")
+		repository.Restore("HEAD", "1.txt")
+		repository.Restore("HEAD", "1.txt")
+		repository.SaveIndex()
+
+		testifyAssert.Equal(t, fixtureReadFile(dir.Join("1.txt")), "the original content.")
+	}
+
+	// Check for file removed (should remove removal from index)
+	{
+		// Setup
+
+		fixtureWriteFile(dir.Join("2.txt"), []byte("the original content."))
+		repository.IndexFile("2.txt")
+		repository.SaveIndex()
+		repository.CreateSave("initial save")
+
+		// Test
+
+		repository = GetRepository(dir.Path())
+		repository.RemoveFile("2.txt")
+
+		testifyAssert.Equal(t, len(repository.index), 1)
+		testifyAssert.Equal(t, repository.index[0].removal.filepath, dir.Join("2.txt"))
+		testifyAssert.False(t, fixtureFileExists(dir.Join("2.txt")))
+
+		repository.Restore("HEAD", "2.txt")
+		repository.SaveIndex()
+
+		testifyAssert.Equal(t, len(repository.index), 0)
+		testifyAssert.True(t, fixtureFileExists(dir.Join("2.txt")))
+		testifyAssert.Equal(t, fixtureReadFile(dir.Join("2.txt")), "the original content.")
+	}
 }
