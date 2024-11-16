@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -31,6 +32,14 @@ type Status struct {
 		UntrackedFilePaths []string
 		RemovedFilePaths   []string
 	}
+}
+
+type ValidationError struct {
+	message string
+}
+
+func (err *ValidationError) Error() string {
+	return fmt.Sprintf("Validation Error: %s", err.message)
 }
 
 func (repository *Repository) writeObject(filepath string, file *os.File) *File {
@@ -171,12 +180,12 @@ func (repository *Repository) SaveIndex() {
 	}
 }
 
-func (repository *Repository) CreateSave(message string) *Save {
+func (repository *Repository) CreateSave(message string) *CheckPoint {
 	if len(repository.index) == 0 {
 		errors.Error("Cannot save empty index.")
 	}
 
-	save := Save{
+	save := CheckPoint{
 		message:   message,
 		parent:    repository.head,
 		changes:   repository.index,
@@ -190,7 +199,7 @@ func (repository *Repository) CreateSave(message string) *Save {
 	return &save
 }
 
-func (repository *Repository) writeSave(save *Save) string {
+func (repository *Repository) writeSave(save *CheckPoint) string {
 	var stringBuilder strings.Builder
 
 	_, err := stringBuilder.Write([]byte(fmt.Sprintf("%s\n", save.message)))
@@ -366,4 +375,106 @@ func (repository *Repository) GetStatus() *Status {
 	})
 
 	return &status
+}
+
+func readCheckpoint(file *os.File) *CheckPoint {
+	checkpoint := &CheckPoint{}
+	scanner := bufio.NewScanner(file)
+
+	scanner.Scan()
+	checkpoint.message = scanner.Text()
+
+	scanner.Scan()
+	checkpoint.parent = scanner.Text()
+
+	scanner.Scan()
+	text := scanner.Text()
+	createdAt, err := time.Parse(time.Layout, text)
+	errors.Check(err)
+	checkpoint.createdAt = createdAt
+
+	// skip newline
+	scanner.Scan()
+	// skip warn message
+	scanner.Scan()
+	// skip newline
+	scanner.Scan()
+	// skip newline
+	scanner.Scan()
+	// skip header message
+	scanner.Scan()
+	// skip newline
+	scanner.Scan()
+
+	for scanner.Scan() {
+		change := &Change{}
+
+		changeHeader := strings.Split(scanner.Text(), "\t")
+
+		if len(changeHeader) != 2 {
+			errors.Error("Invalid save format.")
+		}
+
+		if changeHeader[1] == MODIFIED_CHANGE {
+			change.changeType = Modified
+			change.modified = &File{}
+			change.modified.filepath = changeHeader[0]
+			scanner.Scan()
+			change.modified.objectName = scanner.Text()
+		} else {
+			change.changeType = Removal
+			change.removal = &FileRemoval{}
+			change.removal.filepath = changeHeader[0]
+		}
+
+		checkpoint.changes = append(checkpoint.changes, change)
+	}
+
+	return checkpoint
+}
+
+func (repository *Repository) getSave(ref string) *Save {
+	if ref == "" {
+		return nil
+	}
+
+	save := &Save{}
+	var checkpointId string
+
+	if ref == "HEAD" {
+		checkpointId = repository.head
+	} else {
+		checkpointId = ref
+	}
+
+	checkpointFile, err := os.Open(path.Join(repository.root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		errors.Error(err.Error())
+	}
+	defer checkpointFile.Close()
+
+	save.checkpoints = append(save.checkpoints, readCheckpoint(checkpointFile))
+
+	for save.checkpoints[len(save.checkpoints)-1].parent != "" {
+		checkpointId = save.checkpoints[len(save.checkpoints)-1].parent
+		checkpointFile, err = os.Open(path.Join(repository.root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
+		errors.Check(err)
+		save.checkpoints = append(save.checkpoints, readCheckpoint(checkpointFile))
+		checkpointFile.Close()
+	}
+
+	return save
+}
+
+func (repository *Repository) Restore(ref string, path string) error {
+	save := repository.getSave(ref)
+	if save == nil {
+		return &ValidationError{fmt.Sprintf("\"%s\" is an invalid ref.", ref)}
+	}
+
+	return nil
 }

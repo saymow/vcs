@@ -35,6 +35,10 @@ type Change struct {
 }
 
 type Save struct {
+	checkpoints []*CheckPoint
+}
+
+type CheckPoint struct {
 	id        string
 	message   string
 	createdAt time.Time
