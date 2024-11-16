@@ -41,11 +41,11 @@ func TestIndexFile(t *testing.T) {
 				dir.Join(REPOSITORY_FOLDER_NAME),
 				fs.Expected(
 					t,
-					fs.WithFile("head", ""),
-					fs.WithFile("index", "Tracked files:\r\n\r\n"),
-					fs.WithDir("saves"),
+					fs.WithFile(HEAD_FILE_NAME, ""),
+					fs.WithFile(INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
+					fs.WithDir(SAVES_FOLDER_NAME),
 					fs.WithDir(
-						"objects",
+						OBJECTS_FOLDER_NAME,
 						fs.WithFile(fileHash, buffer.String()),
 					),
 				),
@@ -77,11 +77,11 @@ func TestIndexFile(t *testing.T) {
 					dir.Join(REPOSITORY_FOLDER_NAME),
 					fs.Expected(
 						t,
-						fs.WithFile("head", ""),
-						fs.WithFile("index", "Tracked files:\r\n\r\n"),
-						fs.WithDir("saves"),
+						fs.WithFile(HEAD_FILE_NAME, ""),
+						fs.WithFile(INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
+						fs.WithDir(SAVES_FOLDER_NAME),
 						fs.WithDir(
-							"objects",
+							OBJECTS_FOLDER_NAME,
 							fs.WithFile(fileHash, buffer.String()),
 						),
 					),
@@ -129,11 +129,11 @@ func TestIndexFile(t *testing.T) {
 				dir.Join(REPOSITORY_FOLDER_NAME),
 				fs.Expected(
 					t,
-					fs.WithFile("head", ""),
-					fs.WithFile("index", "Tracked files:\r\n\r\n"),
-					fs.WithDir("saves"),
+					fs.WithFile(HEAD_FILE_NAME, ""),
+					fs.WithFile(INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
+					fs.WithDir(SAVES_FOLDER_NAME),
 					fs.WithDir(
-						"objects",
+						OBJECTS_FOLDER_NAME,
 						fs.WithFile(fileHash, buffer.String()),
 					),
 				),
@@ -490,12 +490,12 @@ Files:
 			dir.Join(REPOSITORY_FOLDER_NAME),
 			fs.Expected(
 				t,
-				fs.WithFile("head", firstSave.id),
-				fs.WithFile("index", "Tracked files:\n\n"),
-				fs.WithDir("saves",
+				fs.WithFile(HEAD_FILE_NAME, firstSave.id),
+				fs.WithFile(INDEX_FILE_NAME, "Tracked files:\n\n"),
+				fs.WithDir(SAVES_FOLDER_NAME,
 					fs.WithFile(firstSave.id, expectedFirstSaveFileContent),
 				),
-				fs.WithDir("objects"),
+				fs.WithDir(OBJECTS_FOLDER_NAME),
 			),
 		),
 	)
@@ -568,14 +568,62 @@ Files:
 			dir.Join(REPOSITORY_FOLDER_NAME),
 			fs.Expected(
 				t,
-				fs.WithFile("head", secondSave.id),
-				fs.WithFile("index", "Tracked files:\n\n"),
-				fs.WithDir("saves",
+				fs.WithFile(HEAD_FILE_NAME, secondSave.id),
+				fs.WithFile(INDEX_FILE_NAME, "Tracked files:\n\n"),
+				fs.WithDir(SAVES_FOLDER_NAME,
 					fs.WithFile(firstSave.id, expectedFirstSaveFileContent),
 					fs.WithFile(secondSave.id, expectedSecondSaveFileContent),
 				),
-				fs.WithDir("objects"),
+				fs.WithDir(OBJECTS_FOLDER_NAME),
 			),
 		),
+	)
+}
+
+//	Staged struct {
+//		CreatedFilesPaths []string
+//		ModifiedFilePaths []string
+//		RemovedFilePaths  []string
+//
+//	WorkingDir struct {
+//		ModifiedFilePaths  []string
+//		UntrackedFilePaths []string
+//		RemovedFilePaths   []string
+func TestGetStatus(t *testing.T) {
+	dir, repository := fixtureGetBaseProject(t)
+	defer dir.Remove()
+
+	repository.IndexFile("1.txt")
+	repository.IndexFile(path.Join("a", "4.txt"))
+	repository.IndexFile(path.Join("a", "b", "6.txt"))
+	repository.IndexFile(path.Join("c", "8.txt"))
+	repository.IndexFile(path.Join("c", "9.txt"))
+	repository.SaveIndex()
+	repository.CreateSave("initial save")
+
+	repository = GetRepository(dir.Path())
+
+	repository.IndexFile("2.txt")
+	fixtureWriteFile(dir.Join("a", "4.txt"), []byte("4 new content"))
+	repository.IndexFile(path.Join("a", "4.txt"))
+	repository.RemoveFile(path.Join("a", "b", "6.txt"))
+	repository.SaveIndex()
+
+	repository = GetRepository(dir.Path())
+
+	fixtureWriteFile(dir.Join("c", "8.txt"), []byte("8 new content"))
+	fixtureRemoveFile(dir.Join("c", "9.txt"))
+
+	status := repository.GetStatus()
+
+	testifyAssert.EqualValues(t, status.Staged.CreatedFilesPaths, []string{dir.Join("2.txt")})
+	testifyAssert.EqualValues(t, status.Staged.ModifiedFilePaths, []string{dir.Join("a", "4.txt")})
+	testifyAssert.EqualValues(t, status.Staged.RemovedFilePaths, []string{dir.Join("a", "b", "6.txt")})
+	testifyAssert.EqualValues(t, status.WorkingDir.ModifiedFilePaths, []string{dir.Join("c", "8.txt")})
+	testifyAssert.EqualValues(t, status.WorkingDir.RemovedFilePaths, []string{dir.Join("c", "9.txt")})
+	testifyAssert.EqualValues(
+		t,
+		status.WorkingDir.UntrackedFilePaths,
+		[]string{dir.Join("3.txt"), dir.Join("a", "5.txt"), dir.Join("a", "b", "7.txt")},
 	)
 }

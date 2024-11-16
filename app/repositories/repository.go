@@ -20,7 +20,7 @@ import (
 	"github.com/golang-collections/collections/set"
 )
 
-type RepositoryStatus struct {
+type Status struct {
 	Staged struct {
 		CreatedFilesPaths []string
 		ModifiedFilePaths []string
@@ -271,8 +271,8 @@ func (repository *Repository) findSavedObject(filepath string) *File {
 	return repository.dir.findFile(normalizedPath)
 }
 
-func (repository *Repository) GetStatus() *RepositoryStatus {
-	status := RepositoryStatus{}
+func (repository *Repository) GetStatus() *Status {
+	status := Status{}
 	seenPaths := set.New()
 	trackedPaths := set.New()
 

@@ -13,9 +13,9 @@ import (
 
 func fixtureMakeBasicRepositoryFs(dir *fs.Dir) fs.PathOp {
 	return fs.WithDir(
-		".repository",
+		REPOSITORY_FOLDER_NAME,
 		fs.WithDir(
-			"saves",
+			SAVES_FOLDER_NAME,
 			fs.WithFile(
 				"9a35bd416196f27e40f4f9e4768496ef29c1922f0ab5e2651a218e4d4cb09688",
 				fmt.Sprintf(`initial save
@@ -50,13 +50,13 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 			),
 		),
 		fs.WithDir(
-			"objects",
+			OBJECTS_FOLDER_NAME,
 			fs.WithFile("814f15a360c1a700342d1652e3bd8b9c954ee2ad9c974f6ec88eb92ff2d6b3b3", ""),
 			fs.WithFile("6f6367cbecfac86af4e749156e1b1046524eff9afbd8a29c964c3b46ebdf7fc2", ""),
 			fs.WithFile("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", ""),
 		),
-		fs.WithFile("head", "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2"),
-		fs.WithFile("index", fmt.Sprintf(`Tracked files:
+		fs.WithFile(HEAD_FILE_NAME, "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2"),
+		fs.WithFile(INDEX_FILE_NAME, fmt.Sprintf(`Tracked files:
 	
 %s	(modified)
 814f15a360c1a700342d1652e3bd8b9c954ee2ad9c974f6ec88eb92ff2d6b3b3
@@ -160,5 +160,10 @@ func fixtureWriteFile(filepath string, content []byte) {
 	defer file.Close()
 
 	_, err = file.Write(content)
+	errors.Check(err)
+}
+
+func fixtureRemoveFile(filepath string) {
+	err := os.Remove(filepath)
 	errors.Check(err)
 }
