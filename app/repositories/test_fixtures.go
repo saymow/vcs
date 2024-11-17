@@ -156,7 +156,15 @@ func fixtureReadFile(filepath string) string {
 
 func fixtureWriteFile(filepath string, content []byte) {
 	file, err := os.OpenFile(filepath, os.O_WRONLY|os.O_TRUNC, 0644)
-	errors.Check(err)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			errors.Error(err.Error())
+		}
+
+		file, err = os.Create(filepath)
+		errors.Check(err)
+	}
+
 	defer file.Close()
 
 	_, err = file.Write(content)

@@ -702,7 +702,7 @@ func TestRestoreHeadDir(t *testing.T) {
 	dir, repository := fixtureGetBaseProject(t)
 	defer dir.Remove()
 
-	// Check for files changed and removed (untracked files should be deleted)
+	// Check for files changed and removed - subdir (untracked files should be deleted)
 	{
 		// Setup
 
@@ -730,6 +730,54 @@ func TestRestoreHeadDir(t *testing.T) {
 					fs.WithFile("4.txt", "file 4 original content."),
 					fs.WithDir("b",
 						fs.WithFile("6.txt", "file 6 original content."),
+					),
+				),
+			),
+		)
+	}
+
+	// Check for files changed and removed - root (untracked files should be deleted)
+	{
+		// Setup
+
+		fixtureWriteFile(dir.Join("1.txt"), []byte("file 1 original content."))
+		fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 original content."))
+		fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 original content."))
+		fixtureWriteFile(dir.Join("c", "8.txt"), []byte("file 8 original content."))
+
+		repository.IndexFile(dir.Join("1.txt"))
+		repository.IndexFile(dir.Join("a", "4.txt"))
+		repository.IndexFile(dir.Join("a", "b", "6.txt"))
+		repository.IndexFile(dir.Join("c", "8.txt"))
+		repository.SaveIndex()
+		repository.CreateSave("initial save")
+
+		fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 updated content."))
+		fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
+		fixtureWriteFile(dir.Join("newfile.txt"), []byte("new file content."))
+
+		repository = GetRepository(dir.Path())
+		repository.Restore("HEAD", "")
+
+		// Test
+
+		assert.Assert(
+			t,
+			fs.Equal(
+				dir.Path(),
+				fs.Expected(
+					t,
+					fs.WithDir(REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+					fs.WithFile("1.txt", "file 1 original content."),
+					fs.WithDir(
+						"a",
+						fs.WithFile("4.txt", "file 4 original content."),
+						fs.WithDir("b",
+							fs.WithFile("6.txt", "file 6 original content."),
+						)),
+					fs.WithDir(
+						"c",
+						fs.WithFile("8.txt", "file 8 original content."),
 					),
 				),
 			),
