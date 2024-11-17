@@ -535,42 +535,86 @@ func (repository *Repository) applyFile(file *File) {
 	}
 }
 
+func (repository *Repository) applyNode(node *Node) {
+	if node.nodeType == FileType {
+		repository.applyFile(node.file)
+		return
+	}
+
+	err := os.Mkdir(node.dir.path, 0644)
+	errors.Check(err)
+}
+
 func (repository *Repository) Restore(ref string, path string) error {
 	save := repository.getSave(ref)
 	if save == nil {
 		return &ValidationError{fmt.Sprintf("\"%s\" is an invalid ref.", ref)}
 	}
 
-	dir := buildDirFromSave(repository.root, save)
-	files := collections.ToMap(dir.collectFiles(path), func(file *File, _ int) string {
-		return file.filepath
-	})
+	rootDir := buildDirFromSave(repository.root, save)
+
+	node := rootDir.findNode(path)
+	if node == nil {
+		return &ValidationError{fmt.Sprintf("\"%s\" is a invalid path.", ref)}
+	}
+
+	nodes := []*Node{}
 	filesRemovedFromIndex := []*File{}
+
+	if node.nodeType == DirType {
+		nodes = node.dir.preOrderTraversal()
+	} else {
+		nodes = append(nodes, node)
+	}
 
 	if ref == "HEAD" {
 		// index files have higher priority over tree files to be restored
 
 		for idx, change := range slices.Clone(repository.index) {
+			// might the time of O(nm) become a problem?
+			// idk, we reading and writing a lot on the disk, this is irrelevant.
+
+			var filepath string
+
 			if change.changeType == Modified {
-				if _, ok := files[change.modified.filepath]; ok {
-					// should override history file and remove modification from the index
-
-					files[change.modified.filepath] = change.modified
-					filesRemovedFromIndex = append(filesRemovedFromIndex, change.modified)
-					repository.index = slices.Delete(repository.index, idx, idx+1)
-				}
+				filepath = change.modified.filepath
 			} else {
-				if _, ok := files[change.removal.filepath]; ok {
-					// should remove removal change from the index
+				filepath = change.removal.filepath
+			}
 
-					repository.index = slices.Delete(repository.index, idx, idx+1)
+			nodeIdx := collections.FindIndex(nodes, func(node *Node, _ int) bool {
+				if node.nodeType == DirType {
+					return false
 				}
+
+				return node.file.filepath == filepath
+			})
+
+			if nodeIdx == -1 {
+				continue
+			}
+
+			if change.changeType == Modified {
+				// should override history file and remove modification from the index
+
+				nodes[nodeIdx] = &Node{nodeType: FileType, file: change.modified}
+				filesRemovedFromIndex = append(filesRemovedFromIndex, change.modified)
+				repository.index = slices.Delete(repository.index, idx, idx+1)
+			} else {
+				// should remove removal change from the index
+
+				repository.index = slices.Delete(repository.index, idx, idx+1)
 			}
 		}
 	}
 
-	for _, file := range files {
-		repository.applyFile(file)
+	if node.nodeType == DirType {
+		err := os.RemoveAll(node.dir.path)
+		errors.Check(err)
+	}
+
+	for _, node := range nodes {
+		repository.applyNode(node)
 	}
 
 	for _, fileRemoved := range filesRemovedFromIndex {
