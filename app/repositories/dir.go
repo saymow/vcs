@@ -92,17 +92,20 @@ func (root *Dir) collectAllFiles() []*File {
 	return files
 }
 
-func (root *Dir) collectFiles(path string) []*File {
-	node := root.findNode(path)
-	files := []*File{}
+func (root *Dir) preOrderTraversalHelper(nodes *[]*Node) {
+	for _, node := range root.children {
+		*nodes = append(*nodes, node)
 
-	if node != nil {
 		if node.nodeType == DirType {
-			files = node.dir.collectAllFiles()
-		} else {
-			files = append(files, node.file)
+			node.dir.preOrderTraversalHelper(nodes)
 		}
 	}
+}
 
-	return files
+func (root *Dir) preOrderTraversal() []*Node {
+	nodes := []*Node{{nodeType: DirType, dir: root}}
+
+	root.preOrderTraversalHelper(&nodes)
+
+	return nodes
 }
