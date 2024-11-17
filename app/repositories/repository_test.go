@@ -10,6 +10,9 @@ import (
 	path "path/filepath"
 	"saymow/version-manager/app/pkg/collections"
 	"saymow/version-manager/app/pkg/errors"
+	"saymow/version-manager/app/pkg/fixtures"
+	"saymow/version-manager/app/repositories/directory"
+	"saymow/version-manager/app/repositories/filesystem"
 	"testing"
 	"time"
 
@@ -17,6 +20,72 @@ import (
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/fs"
 )
+
+func TestInitRepository(t *testing.T) {
+	dir := fs.NewDir(t, "project")
+	defer dir.Remove()
+
+	CreateRepository(dir.Path())
+
+	assert.Assert(
+		t,
+		fs.Equal(
+			dir.Path(),
+			fs.Expected(
+				t,
+				fs.WithDir(
+					".repository",
+					fs.WithFile("head", ""),
+					fs.WithFile("index", "Tracked files:\r\n\r\n"),
+					fs.WithDir("saves"),
+					fs.WithDir("objects"),
+				),
+			),
+		),
+	)
+}
+
+func TestGetRepository(t *testing.T) {
+	dir := fs.NewDir(t, "project")
+	defer dir.Remove()
+
+	fs.Apply(
+		t,
+		dir,
+		fixtureMakeBasicRepositoryFs(dir),
+	)
+
+	repository := GetRepository(dir.Path())
+
+	assert.Equal(t, repository.fs.Root, dir.Path())
+	assert.Equal(t, repository.head, "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2")
+	testifyAssert.EqualValues(
+		t,
+		repository.index,
+		[]*directory.Change{
+			{
+				ChangeType: directory.Creation,
+				File: &directory.File{
+					Filepath:   dir.Join("4.txt"),
+					ObjectName: "814f15a360c1a700342d1652e3bd8b9c954ee2ad9c974f6ec88eb92ff2d6b3b3",
+				},
+			},
+			{
+				ChangeType: directory.Removal,
+				Removal: &directory.FileRemoval{
+					Filepath: dir.Join("2.txt"),
+				},
+			},
+		},
+	)
+	assert.Equal(t, len(repository.dir.Children), 3)
+	assert.Equal(t, repository.dir.Children["1.txt"].File.Filepath, dir.Join("1.txt"))
+	assert.Equal(t, repository.dir.Children["1.txt"].File.ObjectName, "6f6367cbecfac86af4e749156e1b1046524eff9afbd8a29c964c3b46ebdf7fc2")
+	assert.Equal(t, repository.dir.Children["2.txt"].File.Filepath, dir.Join("2.txt"))
+	assert.Equal(t, repository.dir.Children["2.txt"].File.ObjectName, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+	assert.Equal(t, repository.dir.Children["3.txt"].File.Filepath, dir.Join("3.txt"))
+	assert.Equal(t, repository.dir.Children["3.txt"].File.ObjectName, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+}
 
 func TestIndexFile(t *testing.T) {
 	dir, repository := fixtureGetBaseProject(t)
@@ -38,14 +107,14 @@ func TestIndexFile(t *testing.T) {
 		assert.Assert(
 			t,
 			fs.Equal(
-				dir.Join(REPOSITORY_FOLDER_NAME),
+				dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
 				fs.Expected(
 					t,
-					fs.WithFile(HEAD_FILE_NAME, ""),
-					fs.WithFile(INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
-					fs.WithDir(SAVES_FOLDER_NAME),
+					fs.WithFile(filesystem.HEAD_FILE_NAME, ""),
+					fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
+					fs.WithDir(filesystem.SAVES_FOLDER_NAME),
 					fs.WithDir(
-						OBJECTS_FOLDER_NAME,
+						filesystem.OBJECTS_FOLDER_NAME,
 						fs.WithFile(fileHash, buffer.String()),
 					),
 				),
@@ -55,12 +124,12 @@ func TestIndexFile(t *testing.T) {
 		testifyAssert.EqualValues(
 			t,
 			repository.index,
-			[]*Change{
+			[]*directory.Change{
 				{
-					changeType: Creation,
-					file: &File{
-						filepath:   dir.Join("1.txt"),
-						objectName: fileHash,
+					ChangeType: directory.Creation,
+					File: &directory.File{
+						Filepath:   dir.Join("1.txt"),
+						ObjectName: fileHash,
 					},
 				},
 			})
@@ -74,14 +143,14 @@ func TestIndexFile(t *testing.T) {
 			assert.Assert(
 				t,
 				fs.Equal(
-					dir.Join(REPOSITORY_FOLDER_NAME),
+					dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
 					fs.Expected(
 						t,
-						fs.WithFile(HEAD_FILE_NAME, ""),
-						fs.WithFile(INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
-						fs.WithDir(SAVES_FOLDER_NAME),
+						fs.WithFile(filesystem.HEAD_FILE_NAME, ""),
+						fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
+						fs.WithDir(filesystem.SAVES_FOLDER_NAME),
 						fs.WithDir(
-							OBJECTS_FOLDER_NAME,
+							filesystem.OBJECTS_FOLDER_NAME,
 							fs.WithFile(fileHash, buffer.String()),
 						),
 					),
@@ -91,12 +160,12 @@ func TestIndexFile(t *testing.T) {
 			testifyAssert.EqualValues(
 				t,
 				repository.index,
-				[]*Change{
+				[]*directory.Change{
 					{
-						changeType: Creation,
-						file: &File{
-							filepath:   dir.Join("1.txt"),
-							objectName: fileHash,
+						ChangeType: directory.Creation,
+						File: &directory.File{
+							Filepath:   dir.Join("1.txt"),
+							ObjectName: fileHash,
 						},
 					},
 				},
@@ -126,14 +195,14 @@ func TestIndexFile(t *testing.T) {
 		assert.Assert(
 			t,
 			fs.Equal(
-				dir.Join(REPOSITORY_FOLDER_NAME),
+				dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
 				fs.Expected(
 					t,
-					fs.WithFile(HEAD_FILE_NAME, ""),
-					fs.WithFile(INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
-					fs.WithDir(SAVES_FOLDER_NAME),
+					fs.WithFile(filesystem.HEAD_FILE_NAME, ""),
+					fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
+					fs.WithDir(filesystem.SAVES_FOLDER_NAME),
 					fs.WithDir(
-						OBJECTS_FOLDER_NAME,
+						filesystem.OBJECTS_FOLDER_NAME,
 						fs.WithFile(fileHash, buffer.String()),
 					),
 				),
@@ -143,12 +212,12 @@ func TestIndexFile(t *testing.T) {
 		testifyAssert.EqualValues(
 			t,
 			repository.index,
-			[]*Change{
+			[]*directory.Change{
 				{
-					changeType: Creation,
-					file: &File{
-						filepath:   dir.Join("1.txt"),
-						objectName: fileHash,
+					ChangeType: directory.Creation,
+					File: &directory.File{
+						Filepath:   dir.Join("1.txt"),
+						ObjectName: fileHash,
 					},
 				},
 			},
@@ -166,8 +235,8 @@ func TestIndexFileComplexCases(t *testing.T) {
 		repository.IndexFile("1.txt")
 		repository.IndexFile("1.txt")
 
-		changeIdx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-			return change.changeType == Modification && change.file.filepath == dir.Join("1.txt")
+		changeIdx := collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+			return change.ChangeType == directory.Modification && change.File.Filepath == dir.Join("1.txt")
 		})
 
 		testifyAssert.Equal(t, changeIdx, -1)
@@ -178,7 +247,7 @@ func TestIndexFileComplexCases(t *testing.T) {
 	// it should remove any changes of the file stored in the index.
 	{
 		// Initial change reference
-		var change *Change
+		var change *directory.Change
 
 		// It should index the change flawlessly
 		{
@@ -190,8 +259,8 @@ func TestIndexFileComplexCases(t *testing.T) {
 
 			repository.IndexFile("1.txt")
 
-			changeIdx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-				return change.changeType == Modification && change.file.filepath == dir.Join("1.txt")
+			changeIdx := collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+				return change.ChangeType == directory.Modification && change.File.Filepath == dir.Join("1.txt")
 			})
 
 			testifyAssert.NotEqual(t, changeIdx, -1)
@@ -209,12 +278,12 @@ func TestIndexFileComplexCases(t *testing.T) {
 
 			repository.IndexFile("1.txt")
 
-			changeIdx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-				return change.changeType == Modification && change.file.filepath == dir.Join("1.txt")
+			changeIdx := collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+				return change.ChangeType == directory.Modification && change.File.Filepath == dir.Join("1.txt")
 			})
 
 			testifyAssert.Equal(t, changeIdx, -1)
-			testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, change.file.objectName)))
+			testifyAssert.False(t, fixtures.FileExists(dir.Join(filesystem.REPOSITORY_FOLDER_NAME, filesystem.OBJECTS_FOLDER_NAME, change.File.ObjectName)))
 		}
 	}
 }
@@ -230,11 +299,11 @@ func TestRemoveFile(t *testing.T) {
 		repository.RemoveFile(path.Join("a", "5.txt"))
 		repository.RemoveFile(path.Join("a", "5.txt"))
 
-		changeIdx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-			return change.changeType == Removal && change.removal.filepath == dir.Join("a", "5.txt")
+		changeIdx := collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+			return change.ChangeType == directory.Removal && change.Removal.Filepath == dir.Join("a", "5.txt")
 		})
 		testifyAssert.Equal(t, changeIdx, -1)
-		testifyAssert.False(t, fixtureFileExists(dir.Join("a", "5.txt")))
+		testifyAssert.False(t, fixtures.FileExists(dir.Join("a", "5.txt")))
 	}
 
 	// Check remove file base case (existing only on the tree and working dir)
@@ -244,19 +313,19 @@ func TestRemoveFile(t *testing.T) {
 		repository.RemoveFile("1.txt")
 		repository.RemoveFile("1.txt")
 
-		changeIdx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-			return change.changeType == Removal && change.removal.filepath == dir.Join("1.txt")
+		changeIdx := collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+			return change.ChangeType == directory.Removal && change.Removal.Filepath == dir.Join("1.txt")
 		})
 		testifyAssert.NotEqual(t, changeIdx, -1)
-		testifyAssert.False(t, fixtureFileExists(dir.Join("1.txt")))
+		testifyAssert.False(t, fixtures.FileExists(dir.Join("1.txt")))
 	}
 
 	// Check remove file base case (existing only on the index and working dir)
 	{
 		repository.IndexFile(path.Join("a", "4.txt"))
 
-		idx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-			return change.changeType == Creation && change.file.filepath == dir.Join("a", "4.txt")
+		idx := collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+			return change.ChangeType == directory.Creation && change.File.Filepath == dir.Join("a", "4.txt")
 		})
 
 		testifyAssert.NotEqual(t, idx, -1)
@@ -270,23 +339,23 @@ func TestRemoveFile(t *testing.T) {
 		// Check modification change is removed from the index
 		testifyAssert.Equal(
 			t,
-			collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-				return change.changeType == Modification && change.file.filepath == dir.Join("a", "4.txt")
+			collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+				return change.ChangeType == directory.Modification && change.File.Filepath == dir.Join("a", "4.txt")
 			}),
 			-1,
 		)
 		// Check file is deleted
-		testifyAssert.False(t, fixtureFileExists(dir.Join("a", "4.txt")))
+		testifyAssert.False(t, fixtures.FileExists(dir.Join("a", "4.txt")))
 		// Check object is deleted
-		testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, creationChange.file.objectName)))
+		testifyAssert.False(t, fixtures.FileExists(dir.Join(filesystem.REPOSITORY_FOLDER_NAME, filesystem.OBJECTS_FOLDER_NAME, creationChange.File.ObjectName)))
 	}
 
-	// Check remove file existing on the index, working dir and tree
+	// Check remove file existing on the index, working filesystem.dir and tree
 	{
 		repository.IndexFile(path.Join("3.txt"))
 
-		idx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-			return change.changeType == Modification && change.file.filepath == dir.Join("3.txt")
+		idx := collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+			return change.ChangeType == directory.Modification && change.File.Filepath == dir.Join("3.txt")
 		})
 
 		testifyAssert.NotEqual(t, idx, -1)
@@ -300,20 +369,20 @@ func TestRemoveFile(t *testing.T) {
 		// Check modification change is removed from the index
 		testifyAssert.Equal(
 			t,
-			collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-				return change.changeType == Modification && change.file.filepath == dir.Join("3.txt")
+			collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+				return change.ChangeType == directory.Modification && change.File.Filepath == dir.Join("3.txt")
 			}),
 			-1,
 		)
 		// Check file is deleted
-		testifyAssert.False(t, fixtureFileExists(dir.Join("3.txt")))
+		testifyAssert.False(t, fixtures.FileExists(dir.Join("3.txt")))
 		// Check object is deleted
-		testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, modificationChange.file.objectName)))
+		testifyAssert.False(t, fixtures.FileExists(dir.Join(filesystem.REPOSITORY_FOLDER_NAME, filesystem.OBJECTS_FOLDER_NAME, modificationChange.File.ObjectName)))
 		// Check removal change is added to the index
 		testifyAssert.NotEqual(
 			t,
-			collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-				return change.changeType == Removal && change.removal.filepath == dir.Join("3.txt")
+			collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+				return change.ChangeType == directory.Removal && change.Removal.Filepath == dir.Join("3.txt")
 			}),
 			-1,
 		)
@@ -328,7 +397,7 @@ func TestSaveIndex(t *testing.T) {
 	{
 		repository.SaveIndex()
 
-		fileContent := fixtureReadFile(dir.Join(REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
+		fileContent := fixtures.ReadFile(dir.Join(filesystem.REPOSITORY_FOLDER_NAME, filesystem.INDEX_FILE_NAME))
 
 		assert.Equal(t, fileContent, "Tracked files:\n\n")
 	}
@@ -337,17 +406,17 @@ func TestSaveIndex(t *testing.T) {
 	{
 		repository.index = append(
 			repository.index,
-			&Change{changeType: Modification, file: &File{filepath: dir.Join("1.txt"), objectName: "1.txt-object"}},
-			&Change{changeType: Modification, file: &File{filepath: dir.Join("a", "b", "6.txt"), objectName: "6.txt-object"}},
-			&Change{changeType: Removal, removal: &FileRemoval{filepath: dir.Join("a", "b", "5.txt")}},
-			&Change{changeType: Modification, file: &File{filepath: dir.Join("a", "b", "7.txt"), objectName: "7.txt-object"}},
-			&Change{changeType: Modification, file: &File{filepath: dir.Join("a", "b", "c", "8.txt"), objectName: "8.txt-object"}},
-			&Change{changeType: Removal, removal: &FileRemoval{filepath: dir.Join("a", "b", "c", "9.txt")}},
+			&directory.Change{ChangeType: directory.Modification, File: &directory.File{Filepath: dir.Join("1.txt"), ObjectName: "1.txt-object"}},
+			&directory.Change{ChangeType: directory.Modification, File: &directory.File{Filepath: dir.Join("a", "b", "6.txt"), ObjectName: "6.txt-object"}},
+			&directory.Change{ChangeType: directory.Removal, Removal: &directory.FileRemoval{Filepath: dir.Join("a", "b", "5.txt")}},
+			&directory.Change{ChangeType: directory.Modification, File: &directory.File{Filepath: dir.Join("a", "b", "7.txt"), ObjectName: "7.txt-object"}},
+			&directory.Change{ChangeType: directory.Modification, File: &directory.File{Filepath: dir.Join("a", "b", "c", "8.txt"), ObjectName: "8.txt-object"}},
+			&directory.Change{ChangeType: directory.Removal, Removal: &directory.FileRemoval{Filepath: dir.Join("a", "b", "c", "9.txt")}},
 		)
 
 		repository.SaveIndex()
 
-		received := fixtureReadFile(dir.Join(REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
+		received := fixtures.ReadFile(dir.Join(filesystem.REPOSITORY_FOLDER_NAME, filesystem.INDEX_FILE_NAME))
 		expected := `Tracked files:
 
 %s	(modified)
@@ -378,11 +447,11 @@ func TestSaveIndex(t *testing.T) {
 
 		// Check index updates
 		{
-			repository.index = []*Change{repository.index[0], repository.index[2], repository.index[4]}
+			repository.index = []*directory.Change{repository.index[0], repository.index[2], repository.index[4]}
 
 			repository.SaveIndex()
 
-			received := fixtureReadFile(dir.Join(REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
+			received := fixtures.ReadFile(dir.Join(filesystem.REPOSITORY_FOLDER_NAME, filesystem.INDEX_FILE_NAME))
 			expected := `Tracked files:
 
 %s	(modified)
@@ -412,7 +481,7 @@ func TestCreateSave(t *testing.T) {
 
 	// Check initial save
 
-	indexFilepath := dir.Join(REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME)
+	indexFilepath := dir.Join(filesystem.REPOSITORY_FOLDER_NAME, filesystem.INDEX_FILE_NAME)
 	index := fmt.Sprintf(`Tracked files:
 	
 %s	(modified)
@@ -425,7 +494,7 @@ func TestCreateSave(t *testing.T) {
 		dir.Join("a", "4.txt"),
 		dir.Join("a", "b", "6.txt"),
 	)
-	fixtureWriteFile(indexFilepath, []byte(index))
+	fixtures.WriteFile(indexFilepath, []byte(index))
 
 	repository := GetRepository(dir.Path())
 	firstSave := repository.CreateSave("first save")
@@ -445,41 +514,41 @@ Files:
 %s	(modified)
 %s
 `,
-		firstSave.message,
-		firstSave.createdAt.Format(time.Layout),
-		firstSave.changes[0].file.filepath,
-		firstSave.changes[0].file.objectName,
-		firstSave.changes[1].file.filepath,
-		firstSave.changes[1].file.objectName,
-		firstSave.changes[2].file.filepath,
-		firstSave.changes[2].file.objectName,
+		firstSave.Message,
+		firstSave.CreatedAt.Format(time.Layout),
+		firstSave.Changes[0].File.Filepath,
+		firstSave.Changes[0].File.ObjectName,
+		firstSave.Changes[1].File.Filepath,
+		firstSave.Changes[1].File.ObjectName,
+		firstSave.Changes[2].File.Filepath,
+		firstSave.Changes[2].File.ObjectName,
 	)
 
-	testifyAssert.Equal(t, firstSave.message, "first save")
-	testifyAssert.Equal(t, firstSave.parent, "")
+	testifyAssert.Equal(t, firstSave.Message, "first save")
+	testifyAssert.Equal(t, firstSave.Parent, "")
 	testifyAssert.EqualValues(
 		t,
-		firstSave.changes,
-		[]*Change{
+		firstSave.Changes,
+		[]*directory.Change{
 			{
-				changeType: Modification,
-				file: &File{
-					filepath:   dir.Join("1.txt"),
-					objectName: "1.txt-object",
+				ChangeType: directory.Modification,
+				File: &directory.File{
+					Filepath:   dir.Join("1.txt"),
+					ObjectName: "1.txt-object",
 				},
 			},
 			{
-				changeType: Modification,
-				file: &File{
-					filepath:   dir.Join("a", "4.txt"),
-					objectName: "4.txt-object",
+				ChangeType: directory.Modification,
+				File: &directory.File{
+					Filepath:   dir.Join("a", "4.txt"),
+					ObjectName: "4.txt-object",
 				},
 			},
 			{
-				changeType: Modification,
-				file: &File{
-					filepath:   dir.Join("a", "b", "6.txt"),
-					objectName: "6.txt-object",
+				ChangeType: directory.Modification,
+				File: &directory.File{
+					Filepath:   dir.Join("a", "b", "6.txt"),
+					ObjectName: "6.txt-object",
 				},
 			},
 		},
@@ -487,15 +556,15 @@ Files:
 	assert.Assert(
 		t,
 		fs.Equal(
-			dir.Join(REPOSITORY_FOLDER_NAME),
+			dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
 			fs.Expected(
 				t,
-				fs.WithFile(HEAD_FILE_NAME, firstSave.id),
-				fs.WithFile(INDEX_FILE_NAME, "Tracked files:\n\n"),
-				fs.WithDir(SAVES_FOLDER_NAME,
-					fs.WithFile(firstSave.id, expectedFirstSaveFileContent),
+				fs.WithFile(filesystem.HEAD_FILE_NAME, firstSave.Id),
+				fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\n\n"),
+				fs.WithDir(filesystem.SAVES_FOLDER_NAME,
+					fs.WithFile(firstSave.Id, expectedFirstSaveFileContent),
 				),
-				fs.WithDir(OBJECTS_FOLDER_NAME),
+				fs.WithDir(filesystem.OBJECTS_FOLDER_NAME),
 			),
 		),
 	)
@@ -512,7 +581,7 @@ Files:
 		dir.Join("a", "4.txt"),
 		dir.Join("a", "b", "c", "8.txt"),
 	)
-	fixtureWriteFile(indexFilepath, []byte(index))
+	fixtures.WriteFile(indexFilepath, []byte(index))
 
 	repository = GetRepository(dir.Path())
 	secondSave := repository.CreateSave("second save")
@@ -530,34 +599,34 @@ Files:
 %s	(modified)
 %s
 `,
-		secondSave.message,
-		secondSave.parent,
-		secondSave.createdAt.Format(time.Layout),
-		secondSave.changes[0].removal.filepath,
-		secondSave.changes[1].removal.filepath,
-		secondSave.changes[2].file.filepath,
-		secondSave.changes[2].file.objectName,
+		secondSave.Message,
+		secondSave.Parent,
+		secondSave.CreatedAt.Format(time.Layout),
+		secondSave.Changes[0].Removal.Filepath,
+		secondSave.Changes[1].Removal.Filepath,
+		secondSave.Changes[2].File.Filepath,
+		secondSave.Changes[2].File.ObjectName,
 	)
 
-	testifyAssert.Equal(t, secondSave.message, "second save")
-	testifyAssert.Equal(t, secondSave.parent, firstSave.id)
+	testifyAssert.Equal(t, secondSave.Message, "second save")
+	testifyAssert.Equal(t, secondSave.Parent, firstSave.Id)
 	testifyAssert.EqualValues(
 		t,
-		secondSave.changes,
-		[]*Change{
+		secondSave.Changes,
+		[]*directory.Change{
 			{
-				changeType: Removal,
-				removal:    &FileRemoval{dir.Join("1.txt")},
+				ChangeType: directory.Removal,
+				Removal:    &directory.FileRemoval{Filepath: dir.Join("1.txt")},
 			},
 			{
-				changeType: Removal,
-				removal:    &FileRemoval{dir.Join("a", "4.txt")},
+				ChangeType: directory.Removal,
+				Removal:    &directory.FileRemoval{Filepath: dir.Join("a", "4.txt")},
 			},
 			{
-				changeType: Modification,
-				file: &File{
-					filepath:   dir.Join("a", "b", "c", "8.txt"),
-					objectName: "8.txt-object",
+				ChangeType: directory.Modification,
+				File: &directory.File{
+					Filepath:   dir.Join("a", "b", "c", "8.txt"),
+					ObjectName: "8.txt-object",
 				},
 			},
 		},
@@ -565,16 +634,16 @@ Files:
 	assert.Assert(
 		t,
 		fs.Equal(
-			dir.Join(REPOSITORY_FOLDER_NAME),
+			dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
 			fs.Expected(
 				t,
-				fs.WithFile(HEAD_FILE_NAME, secondSave.id),
-				fs.WithFile(INDEX_FILE_NAME, "Tracked files:\n\n"),
-				fs.WithDir(SAVES_FOLDER_NAME,
-					fs.WithFile(firstSave.id, expectedFirstSaveFileContent),
-					fs.WithFile(secondSave.id, expectedSecondSaveFileContent),
+				fs.WithFile(filesystem.HEAD_FILE_NAME, secondSave.Id),
+				fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\n\n"),
+				fs.WithDir(filesystem.SAVES_FOLDER_NAME,
+					fs.WithFile(firstSave.Id, expectedFirstSaveFileContent),
+					fs.WithFile(secondSave.Id, expectedSecondSaveFileContent),
 				),
-				fs.WithDir(OBJECTS_FOLDER_NAME),
+				fs.WithDir(filesystem.OBJECTS_FOLDER_NAME),
 			),
 		),
 	)
@@ -595,15 +664,15 @@ func TestGetStatus(t *testing.T) {
 	repository = GetRepository(dir.Path())
 
 	repository.IndexFile("2.txt")
-	fixtureWriteFile(dir.Join("a", "4.txt"), []byte("4 new content"))
+	fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("4 new content"))
 	repository.IndexFile(path.Join("a", "4.txt"))
 	repository.RemoveFile(path.Join("a", "b", "6.txt"))
 	repository.SaveIndex()
 
 	repository = GetRepository(dir.Path())
 
-	fixtureWriteFile(dir.Join("c", "8.txt"), []byte("8 new content"))
-	fixtureRemoveFile(dir.Join("c", "9.txt"))
+	fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("8 new content"))
+	fixtures.RemoveFile(dir.Join("c", "9.txt"))
 
 	status := repository.GetStatus()
 
@@ -636,17 +705,17 @@ func TestLoadHeadSingleFile(t *testing.T) {
 	{
 		// Setup
 		{
-			fixtureWriteFile(dir.Join("1.txt"), []byte("the original content."))
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("the original content."))
 			repository.IndexFile("1.txt")
 			repository.SaveIndex()
 			repository.CreateSave("initial save")
 
 			repository = GetRepository(dir.Path())
-			fixtureWriteFile(dir.Join("1.txt"), []byte("not the original content. Saved on the index"))
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("not the original content. Saved on the index"))
 			repository.IndexFile("1.txt")
 			repository.SaveIndex()
 
-			fixtureWriteFile(dir.Join("1.txt"), []byte("someone messed up!"))
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("someone messed up!"))
 		}
 
 		// Test
@@ -654,12 +723,12 @@ func TestLoadHeadSingleFile(t *testing.T) {
 			// 1) Ensure index priority (and remove files from it)
 			repository = GetRepository(dir.Path())
 			testifyAssert.Equal(t, len(repository.index), 1)
-			testifyAssert.Equal(t, repository.index[0].file.filepath, dir.Join("1.txt"))
+			testifyAssert.Equal(t, repository.index[0].File.Filepath, dir.Join("1.txt"))
 			repository.Load("HEAD", "1.txt")
 			repository.SaveIndex()
 
 			testifyAssert.Equal(t, len(repository.index), 0)
-			testifyAssert.Equal(t, fixtureReadFile(dir.Join("1.txt")), "not the original content. Saved on the index")
+			testifyAssert.Equal(t, fixtures.ReadFile(dir.Join("1.txt")), "not the original content. Saved on the index")
 
 			// 1) When no index files, use history file
 			repository = GetRepository(dir.Path())
@@ -669,7 +738,7 @@ func TestLoadHeadSingleFile(t *testing.T) {
 			repository.Load("HEAD", "1.txt")
 			repository.SaveIndex()
 
-			testifyAssert.Equal(t, fixtureReadFile(dir.Join("1.txt")), "the original content.")
+			testifyAssert.Equal(t, fixtures.ReadFile(dir.Join("1.txt")), "the original content.")
 		}
 	}
 
@@ -677,7 +746,7 @@ func TestLoadHeadSingleFile(t *testing.T) {
 	{
 		// Setup
 		{
-			fixtureWriteFile(dir.Join("2.txt"), []byte("the original content."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("the original content."))
 			repository.IndexFile("2.txt")
 			repository.SaveIndex()
 			repository.CreateSave("initial save")
@@ -689,15 +758,15 @@ func TestLoadHeadSingleFile(t *testing.T) {
 			repository.RemoveFile("2.txt")
 
 			testifyAssert.Equal(t, len(repository.index), 1)
-			testifyAssert.Equal(t, repository.index[0].removal.filepath, dir.Join("2.txt"))
-			testifyAssert.False(t, fixtureFileExists(dir.Join("2.txt")))
+			testifyAssert.Equal(t, repository.index[0].Removal.Filepath, dir.Join("2.txt"))
+			testifyAssert.False(t, fixtures.FileExists(dir.Join("2.txt")))
 
 			repository.Load("HEAD", "2.txt")
 			repository.SaveIndex()
 
 			testifyAssert.Equal(t, len(repository.index), 0)
-			testifyAssert.True(t, fixtureFileExists(dir.Join("2.txt")))
-			testifyAssert.Equal(t, fixtureReadFile(dir.Join("2.txt")), "the original content.")
+			testifyAssert.True(t, fixtures.FileExists(dir.Join("2.txt")))
+			testifyAssert.Equal(t, fixtures.ReadFile(dir.Join("2.txt")), "the original content.")
 		}
 	}
 }
@@ -710,15 +779,15 @@ func TestLoadHeadDir(t *testing.T) {
 	{
 		// Setup
 		{
-			fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 original content."))
-			fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 original content."))
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 original content."))
+			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 original content."))
 
 			repository.IndexFile(dir.Join("a", "4.txt"))
 			repository.IndexFile(dir.Join("a", "b", "6.txt"))
 			repository.SaveIndex()
 			repository.CreateSave("initial save")
 
-			fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 updated content."))
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 updated content."))
 
 			repository = GetRepository(dir.Path())
 			repository.Load("HEAD", "a")
@@ -746,10 +815,10 @@ func TestLoadHeadDir(t *testing.T) {
 	{
 		// Setup
 		{
-			fixtureWriteFile(dir.Join("1.txt"), []byte("file 1 original content."))
-			fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 original content."))
-			fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 original content."))
-			fixtureWriteFile(dir.Join("c", "8.txt"), []byte("file 8 original content."))
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 original content."))
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 original content."))
+			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 original content."))
+			fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 original content."))
 
 			repository.IndexFile(dir.Join("1.txt"))
 			repository.IndexFile(dir.Join("a", "4.txt"))
@@ -758,11 +827,11 @@ func TestLoadHeadDir(t *testing.T) {
 			repository.SaveIndex()
 			repository.CreateSave("initial save")
 
-			fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 updated content."))
-			fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
-			fixtureWriteFile(dir.Join("newfile.txt"), []byte("new file content."))
-			fixtureMakeDirs(dir.Join("dir1"), dir.Join("dir1", "dir2"), dir.Join("dir1", "dir2", "dir3"))
-			fixtureWriteFile(dir.Join("dir1", "dir2", "dir3", "10.txt"), []byte("file 10 original content."))
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 updated content."))
+			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
+			fixtures.WriteFile(dir.Join("newfile.txt"), []byte("new file content."))
+			fixtures.MakeDirs(dir.Join("dir1"), dir.Join("dir1", "dir2"), dir.Join("dir1", "dir2", "dir3"))
+			fixtures.WriteFile(dir.Join("dir1", "dir2", "dir3", "10.txt"), []byte("file 10 original content."))
 
 			repository = GetRepository(dir.Path())
 			repository.IndexFile(path.Join("dir1", "dir2", "dir3", "10.txt"))
@@ -782,7 +851,7 @@ func TestLoadHeadDir(t *testing.T) {
 					dir.Path(),
 					fs.Expected(
 						t,
-						fs.WithDir(REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+						fs.WithDir(filesystem.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
 						fs.WithFile("1.txt", "file 1 original content."),
 						fs.WithDir(
 							"a",
@@ -814,19 +883,19 @@ func TestLoadHistory(t *testing.T) {
 
 	// Check for files changed and removed - root (untracked files should be deleted)
 	{
-		var save0 *CheckPoint
-		var save3 *CheckPoint
-		var save5 *CheckPoint
+		var save0 *filesystem.CheckPoint
+		var save3 *filesystem.CheckPoint
+		var save5 *filesystem.CheckPoint
 
 		// Setup
 		{
 			// Save 0 Changes
 
-			fixtureWriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0)."))
-			fixtureWriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0)."))
-			fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
-			fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
-			fixtureWriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
 
 			repository.IndexFile(dir.Join("1.txt"))
 			repository.IndexFile(dir.Join("2.txt"))
@@ -840,7 +909,7 @@ func TestLoadHistory(t *testing.T) {
 
 			repository = GetRepository(dir.Path())
 
-			fixtureWriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1)."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1)."))
 
 			repository.IndexFile(dir.Join("2.txt"))
 			repository.SaveIndex()
@@ -850,7 +919,7 @@ func TestLoadHistory(t *testing.T) {
 
 			repository = GetRepository(dir.Path())
 
-			fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0) (SAVE 2)."))
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0) (SAVE 2)."))
 
 			repository.IndexFile(dir.Join("a", "4.txt"))
 			repository.SaveIndex()
@@ -860,12 +929,12 @@ func TestLoadHistory(t *testing.T) {
 
 			repository = GetRepository(dir.Path())
 
-			fixtureWriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1) (SAVE 3)."))
-			fixtureMakeDirs(dir.Join("dir1"), dir.Join("dir1", "dir2"), dir.Join("dir1", "dir2", "dir3"), dir.Join("dir1", "dir2", "dir3", "dir4"))
-			fixtureWriteFile(dir.Join("dir1", "10.txt"), []byte("file 10 (SAVE 3)."))
-			fixtureWriteFile(dir.Join("dir1", "dir2", "11.txt"), []byte("file 11 (SAVE 3)."))
-			fixtureWriteFile(dir.Join("dir1", "dir2", "dir3", "12.txt"), []byte("file 12 (SAVE 3)."))
-			fixtureWriteFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"), []byte("file 13 (SAVE 3)."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1) (SAVE 3)."))
+			fixtures.MakeDirs(dir.Join("dir1"), dir.Join("dir1", "dir2"), dir.Join("dir1", "dir2", "dir3"), dir.Join("dir1", "dir2", "dir3", "dir4"))
+			fixtures.WriteFile(dir.Join("dir1", "10.txt"), []byte("file 10 (SAVE 3)."))
+			fixtures.WriteFile(dir.Join("dir1", "dir2", "11.txt"), []byte("file 11 (SAVE 3)."))
+			fixtures.WriteFile(dir.Join("dir1", "dir2", "dir3", "12.txt"), []byte("file 12 (SAVE 3)."))
+			fixtures.WriteFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"), []byte("file 13 (SAVE 3)."))
 
 			repository.IndexFile(dir.Join("2.txt"))
 			repository.IndexFile(dir.Join("dir1", "10.txt"))
@@ -879,11 +948,11 @@ func TestLoadHistory(t *testing.T) {
 
 			repository = GetRepository(dir.Path())
 
-			fixtureWriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0) (SAVE 4)."))
-			fixtureWriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1) (SAVE 3) (SAVE 4)."))
-			fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0) (SAVE 2) (SAVE 4)."))
-			fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0) (SAVE 4)."))
-			fixtureWriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0) (SAVE 4)."))
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0) (SAVE 4)."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1) (SAVE 3) (SAVE 4)."))
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0) (SAVE 2) (SAVE 4)."))
+			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0) (SAVE 4)."))
+			fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0) (SAVE 4)."))
 
 			repository.RemoveFile(dir.Join("dir1", "10.txt"))
 			repository.RemoveFile(dir.Join("dir1", "dir2", "11.txt"))
@@ -909,16 +978,14 @@ func TestLoadHistory(t *testing.T) {
 
 			// Working dir changes
 
-			repository = GetRepository(dir.Path())
-
-			fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
-			fixtureWriteFile(dir.Join("newfile.txt"), []byte("new file content."))
+			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
+			fixtures.WriteFile(dir.Join("newfile.txt"), []byte("new file content."))
 		}
 
 		// Test Save 3
 		{
 			repository = GetRepository(dir.Path())
-			repository.Load(save3.id, "")
+			repository.Load(save3.Id, "")
 
 			assert.Assert(
 				t,
@@ -926,7 +993,7 @@ func TestLoadHistory(t *testing.T) {
 					dir.Path(),
 					fs.Expected(
 						t,
-						fs.WithDir(REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+						fs.WithDir(filesystem.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
 						fs.WithFile("1.txt", "file 1 (SAVE 0)."),
 						fs.WithFile("2.txt", "file 2 (SAVE 0) (SAVE 1) (SAVE 3)."),
 						fs.WithDir(
@@ -963,7 +1030,7 @@ func TestLoadHistory(t *testing.T) {
 		// Test Save 0
 		{
 			repository = GetRepository(dir.Path())
-			repository.Load(save0.id, "")
+			repository.Load(save0.Id, "")
 
 			assert.Assert(
 				t,
@@ -971,7 +1038,7 @@ func TestLoadHistory(t *testing.T) {
 					dir.Path(),
 					fs.Expected(
 						t,
-						fs.WithDir(REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+						fs.WithDir(filesystem.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
 						fs.WithFile("1.txt", "file 1 (SAVE 0)."),
 						fs.WithFile("2.txt", "file 2 (SAVE 0)."),
 						fs.WithDir(
@@ -992,7 +1059,7 @@ func TestLoadHistory(t *testing.T) {
 		// Test Save 5
 		{
 			repository = GetRepository(dir.Path())
-			repository.Load(save5.id, "")
+			repository.Load(save5.Id, "")
 
 			assert.Assert(
 				t,
@@ -1000,7 +1067,7 @@ func TestLoadHistory(t *testing.T) {
 					dir.Path(),
 					fs.Expected(
 						t,
-						fs.WithDir(REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+						fs.WithDir(filesystem.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
 						fs.WithDir(
 							"a",
 							fs.WithDir("b",
