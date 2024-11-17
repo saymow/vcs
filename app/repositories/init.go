@@ -24,13 +24,14 @@ type FileRemoval struct {
 type ChangeType int
 
 const (
-	Modified ChangeType = iota
+	Creation ChangeType = iota
+	Modification
 	Removal
 )
 
 type Change struct {
 	changeType ChangeType
-	modified   *File
+	file       *File
 	removal    *FileRemoval
 }
 
@@ -79,6 +80,7 @@ const (
 	HEAD_FILE_NAME         = "head"
 
 	MODIFIED_CHANGE = "(modified)"
+	CREATED_CHANGE  = "(created)"
 	REMOVAL_CHANGE  = "(removed)"
 )
 
@@ -127,12 +129,17 @@ func readIndex(file *os.File) []*Change {
 			errors.Error("Invalid index format.")
 		}
 
-		if changeHeader[1] == MODIFIED_CHANGE {
-			change.changeType = Modified
-			change.modified = &File{}
-			change.modified.filepath = changeHeader[0]
+		if changeHeader[1] == MODIFIED_CHANGE || changeHeader[1] == CREATED_CHANGE {
+			if changeHeader[1] == MODIFIED_CHANGE {
+				change.changeType = Modification
+			} else {
+				change.changeType = Creation
+			}
+
+			change.file = &File{}
+			change.file.filepath = changeHeader[0]
 			scanner.Scan()
-			change.modified.objectName = scanner.Text()
+			change.file.objectName = scanner.Text()
 		} else {
 			change.changeType = Removal
 			change.removal = &FileRemoval{}
@@ -198,12 +205,17 @@ func buildDir(root string, head string) Dir {
 				errors.Error("Invalid save format.")
 			}
 
-			if changeHeader[1] == MODIFIED_CHANGE {
-				change.changeType = Modified
-				change.modified = &File{}
-				change.modified.filepath = changeHeader[0]
+			if changeHeader[1] == MODIFIED_CHANGE || changeHeader[1] == CREATED_CHANGE {
+				if changeHeader[1] == MODIFIED_CHANGE {
+					change.changeType = Modification
+				} else {
+					change.changeType = Creation
+				}
+
+				change.file = &File{}
+				change.file.filepath = changeHeader[0]
 				scanner.Scan()
-				change.modified.objectName = scanner.Text()
+				change.file.objectName = scanner.Text()
 			} else {
 				change.changeType = Removal
 				change.removal = &FileRemoval{}
@@ -221,10 +233,10 @@ func buildDir(root string, head string) Dir {
 	for _, change := range changes {
 		var normalizedPath string
 
-		if change.changeType == Modified {
-			normalizedPath = change.modified.filepath[len(root)+1:]
-		} else {
+		if change.changeType == Removal {
 			normalizedPath = change.removal.filepath[len(root)+1:]
+		} else {
+			normalizedPath = change.file.filepath[len(root)+1:]
 		}
 
 		dir.addNode(normalizedPath, &change)

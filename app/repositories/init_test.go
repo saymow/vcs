@@ -51,8 +51,8 @@ func TestGetRepository(t *testing.T) {
 		repository.index,
 		[]*Change{
 			{
-				changeType: Modified,
-				modified: &File{
+				changeType: Creation,
+				file: &File{
 					filepath:   dir.Join("4.txt"),
 					objectName: "814f15a360c1a700342d1652e3bd8b9c954ee2ad9c974f6ec88eb92ff2d6b3b3",
 				},

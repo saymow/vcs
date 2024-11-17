@@ -27,9 +27,9 @@ Please do not edit the lines below.
 	
 Files:
 	
-%s	(modified)
+%s	(created)
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-%s	(modified)
+%s	(created)
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, dir.Join("1.txt"), dir.Join("2.txt")),
 			),
 			fs.WithFile(
@@ -43,7 +43,7 @@ Please do not edit the lines below.
 
 Files:
 	
-%s	(modified)
+%s	(created)
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 %s	(modified)
 6f6367cbecfac86af4e749156e1b1046524eff9afbd8a29c964c3b46ebdf7fc2`, dir.Join("3.txt"), dir.Join("1.txt")),
@@ -58,7 +58,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 		fs.WithFile(HEAD_FILE_NAME, "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2"),
 		fs.WithFile(INDEX_FILE_NAME, fmt.Sprintf(`Tracked files:
 	
-%s	(modified)
+%s	(created)
 814f15a360c1a700342d1652e3bd8b9c954ee2ad9c974f6ec88eb92ff2d6b3b3
 %s	(removed)`, dir.Join("4.txt"), dir.Join("2.txt"))),
 	)

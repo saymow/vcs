@@ -57,8 +57,8 @@ func TestIndexFile(t *testing.T) {
 			repository.index,
 			[]*Change{
 				{
-					changeType: Modified,
-					modified: &File{
+					changeType: Creation,
+					file: &File{
 						filepath:   dir.Join("1.txt"),
 						objectName: fileHash,
 					},
@@ -93,8 +93,8 @@ func TestIndexFile(t *testing.T) {
 				repository.index,
 				[]*Change{
 					{
-						changeType: Modified,
-						modified: &File{
+						changeType: Creation,
+						file: &File{
 							filepath:   dir.Join("1.txt"),
 							objectName: fileHash,
 						},
@@ -145,8 +145,8 @@ func TestIndexFile(t *testing.T) {
 			repository.index,
 			[]*Change{
 				{
-					changeType: Modified,
-					modified: &File{
+					changeType: Creation,
+					file: &File{
 						filepath:   dir.Join("1.txt"),
 						objectName: fileHash,
 					},
@@ -167,7 +167,7 @@ func TestIndexFileComplexCases(t *testing.T) {
 		repository.IndexFile("1.txt")
 
 		changeIdx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-			return change.changeType == Modified && change.modified.filepath == dir.Join("1.txt")
+			return change.changeType == Modification && change.file.filepath == dir.Join("1.txt")
 		})
 
 		testifyAssert.Equal(t, changeIdx, -1)
@@ -191,7 +191,7 @@ func TestIndexFileComplexCases(t *testing.T) {
 			repository.IndexFile("1.txt")
 
 			changeIdx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-				return change.changeType == Modified && change.modified.filepath == dir.Join("1.txt")
+				return change.changeType == Modification && change.file.filepath == dir.Join("1.txt")
 			})
 
 			testifyAssert.NotEqual(t, changeIdx, -1)
@@ -210,11 +210,11 @@ func TestIndexFileComplexCases(t *testing.T) {
 			repository.IndexFile("1.txt")
 
 			changeIdx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-				return change.changeType == Modified && change.modified.filepath == dir.Join("1.txt")
+				return change.changeType == Modification && change.file.filepath == dir.Join("1.txt")
 			})
 
 			testifyAssert.Equal(t, changeIdx, -1)
-			testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, change.modified.objectName)))
+			testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, change.file.objectName)))
 		}
 	}
 }
@@ -256,11 +256,11 @@ func TestRemoveFile(t *testing.T) {
 		repository.IndexFile(path.Join("a", "4.txt"))
 
 		idx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-			return change.changeType == Modified && change.modified.filepath == dir.Join("a", "4.txt")
+			return change.changeType == Creation && change.file.filepath == dir.Join("a", "4.txt")
 		})
 
 		testifyAssert.NotEqual(t, idx, -1)
-		modificationChange := repository.index[idx]
+		creationChange := repository.index[idx]
 
 		// Test indempontence along
 		repository.RemoveFile(path.Join("a", "4.txt"))
@@ -271,14 +271,14 @@ func TestRemoveFile(t *testing.T) {
 		testifyAssert.Equal(
 			t,
 			collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-				return change.changeType == Modified && change.modified.filepath == dir.Join("a", "4.txt")
+				return change.changeType == Modification && change.file.filepath == dir.Join("a", "4.txt")
 			}),
 			-1,
 		)
 		// Check file is deleted
 		testifyAssert.False(t, fixtureFileExists(dir.Join("a", "4.txt")))
 		// Check object is deleted
-		testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, modificationChange.modified.objectName)))
+		testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, creationChange.file.objectName)))
 	}
 
 	// Check remove file existing on the index, working dir and tree
@@ -286,7 +286,7 @@ func TestRemoveFile(t *testing.T) {
 		repository.IndexFile(path.Join("3.txt"))
 
 		idx := collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-			return change.changeType == Modified && change.modified.filepath == dir.Join("3.txt")
+			return change.changeType == Modification && change.file.filepath == dir.Join("3.txt")
 		})
 
 		testifyAssert.NotEqual(t, idx, -1)
@@ -301,14 +301,14 @@ func TestRemoveFile(t *testing.T) {
 		testifyAssert.Equal(
 			t,
 			collections.FindIndex(repository.index, func(change *Change, _ int) bool {
-				return change.changeType == Modified && change.modified.filepath == dir.Join("3.txt")
+				return change.changeType == Modification && change.file.filepath == dir.Join("3.txt")
 			}),
 			-1,
 		)
 		// Check file is deleted
 		testifyAssert.False(t, fixtureFileExists(dir.Join("3.txt")))
 		// Check object is deleted
-		testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, modificationChange.modified.objectName)))
+		testifyAssert.False(t, fixtureFileExists(dir.Join(REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, modificationChange.file.objectName)))
 		// Check removal change is added to the index
 		testifyAssert.NotEqual(
 			t,
@@ -337,11 +337,11 @@ func TestSaveIndex(t *testing.T) {
 	{
 		repository.index = append(
 			repository.index,
-			&Change{changeType: Modified, modified: &File{filepath: dir.Join("1.txt"), objectName: "1.txt-object"}},
-			&Change{changeType: Modified, modified: &File{filepath: dir.Join("a", "b", "6.txt"), objectName: "6.txt-object"}},
+			&Change{changeType: Modification, file: &File{filepath: dir.Join("1.txt"), objectName: "1.txt-object"}},
+			&Change{changeType: Modification, file: &File{filepath: dir.Join("a", "b", "6.txt"), objectName: "6.txt-object"}},
 			&Change{changeType: Removal, removal: &FileRemoval{filepath: dir.Join("a", "b", "5.txt")}},
-			&Change{changeType: Modified, modified: &File{filepath: dir.Join("a", "b", "7.txt"), objectName: "7.txt-object"}},
-			&Change{changeType: Modified, modified: &File{filepath: dir.Join("a", "b", "c", "8.txt"), objectName: "8.txt-object"}},
+			&Change{changeType: Modification, file: &File{filepath: dir.Join("a", "b", "7.txt"), objectName: "7.txt-object"}},
+			&Change{changeType: Modification, file: &File{filepath: dir.Join("a", "b", "c", "8.txt"), objectName: "8.txt-object"}},
 			&Change{changeType: Removal, removal: &FileRemoval{filepath: dir.Join("a", "b", "c", "9.txt")}},
 		)
 
@@ -447,12 +447,12 @@ Files:
 `,
 		firstSave.message,
 		firstSave.createdAt.Format(time.Layout),
-		firstSave.changes[0].modified.filepath,
-		firstSave.changes[0].modified.objectName,
-		firstSave.changes[1].modified.filepath,
-		firstSave.changes[1].modified.objectName,
-		firstSave.changes[2].modified.filepath,
-		firstSave.changes[2].modified.objectName,
+		firstSave.changes[0].file.filepath,
+		firstSave.changes[0].file.objectName,
+		firstSave.changes[1].file.filepath,
+		firstSave.changes[1].file.objectName,
+		firstSave.changes[2].file.filepath,
+		firstSave.changes[2].file.objectName,
 	)
 
 	testifyAssert.Equal(t, firstSave.message, "first save")
@@ -462,22 +462,22 @@ Files:
 		firstSave.changes,
 		[]*Change{
 			{
-				changeType: Modified,
-				modified: &File{
+				changeType: Modification,
+				file: &File{
 					filepath:   dir.Join("1.txt"),
 					objectName: "1.txt-object",
 				},
 			},
 			{
-				changeType: Modified,
-				modified: &File{
+				changeType: Modification,
+				file: &File{
 					filepath:   dir.Join("a", "4.txt"),
 					objectName: "4.txt-object",
 				},
 			},
 			{
-				changeType: Modified,
-				modified: &File{
+				changeType: Modification,
+				file: &File{
 					filepath:   dir.Join("a", "b", "6.txt"),
 					objectName: "6.txt-object",
 				},
@@ -535,8 +535,8 @@ Files:
 		secondSave.createdAt.Format(time.Layout),
 		secondSave.changes[0].removal.filepath,
 		secondSave.changes[1].removal.filepath,
-		secondSave.changes[2].modified.filepath,
-		secondSave.changes[2].modified.objectName,
+		secondSave.changes[2].file.filepath,
+		secondSave.changes[2].file.objectName,
 	)
 
 	testifyAssert.Equal(t, secondSave.message, "second save")
@@ -554,8 +554,8 @@ Files:
 				removal:    &FileRemoval{dir.Join("a", "4.txt")},
 			},
 			{
-				changeType: Modified,
-				modified: &File{
+				changeType: Modification,
+				file: &File{
 					filepath:   dir.Join("a", "b", "c", "8.txt"),
 					objectName: "8.txt-object",
 				},
@@ -654,7 +654,7 @@ func TestLoadHeadSingleFile(t *testing.T) {
 			// 1) Ensure index priority (and remove files from it)
 			repository = GetRepository(dir.Path())
 			testifyAssert.Equal(t, len(repository.index), 1)
-			testifyAssert.Equal(t, repository.index[0].modified.filepath, dir.Join("1.txt"))
+			testifyAssert.Equal(t, repository.index[0].file.filepath, dir.Join("1.txt"))
 			repository.Load("HEAD", "1.txt")
 			repository.SaveIndex()
 

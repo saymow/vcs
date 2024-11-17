@@ -12,7 +12,7 @@ func (root *Dir) addNodeHelper(segments []string, change *Change) {
 		} else {
 			root.children[segments[0]] = &Node{
 				nodeType: FileType,
-				file:     change.modified,
+				file:     change.file,
 			}
 		}
 

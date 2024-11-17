@@ -98,34 +98,41 @@ func (repository *Repository) IndexFile(filepath string) {
 	object := repository.writeObject(filepath, file)
 	stagedChangeIdx := repository.findStagedChangeIdx(filepath)
 	savedObject := repository.findSavedFile(filepath)
+	var changeType ChangeType
+
+	if savedObject != nil {
+		changeType = Modification
+	} else {
+		changeType = Creation
+	}
 
 	if savedObject != nil && savedObject.objectName == object.objectName {
 		// No changes at all
 
 		if stagedChangeIdx != -1 {
-			if repository.index[stagedChangeIdx].changeType == Modified {
+			if repository.index[stagedChangeIdx].changeType != Removal {
 				// Remove change file object
-				repository.removeObject(repository.index[stagedChangeIdx].modified.objectName)
+				repository.removeObject(repository.index[stagedChangeIdx].file.objectName)
 			}
 
 			// Undo index existing change
 			repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
 		}
 	} else if stagedChangeIdx != -1 {
-		if repository.index[stagedChangeIdx].changeType == Modified &&
-			repository.index[stagedChangeIdx].modified.objectName != object.objectName {
+		if repository.index[stagedChangeIdx].changeType != Removal &&
+			repository.index[stagedChangeIdx].file.objectName != object.objectName {
 			// Remove change file object
-			repository.removeObject(repository.index[stagedChangeIdx].modified.objectName)
+			repository.removeObject(repository.index[stagedChangeIdx].file.objectName)
 		}
 
 		// Undo index existing change
 		repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
 		// Index change
-		repository.index = append(repository.index, &Change{changeType: Modified, modified: object})
+		repository.index = append(repository.index, &Change{changeType: changeType, file: object})
 
 	} else {
 		// Index change
-		repository.index = append(repository.index, &Change{changeType: Modified, modified: object})
+		repository.index = append(repository.index, &Change{changeType: changeType, file: object})
 	}
 }
 
@@ -153,7 +160,7 @@ func (repository *Repository) RemoveFile(filepath string) {
 		}
 
 		// Remove existing change from the index
-		repository.removeObject(repository.index[stagedChangeIdx].modified.objectName)
+		repository.removeObject(repository.index[stagedChangeIdx].file.objectName)
 		repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
 	}
 
@@ -171,8 +178,10 @@ func (repository *Repository) SaveIndex() {
 	errors.Check(err)
 
 	for _, change := range repository.index {
-		if change.changeType == Modified {
-			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.modified.filepath, MODIFIED_CHANGE, change.modified.objectName)))
+		if change.changeType == Modification {
+			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.file.filepath, MODIFIED_CHANGE, change.file.objectName)))
+		} else if change.changeType == Creation {
+			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.file.filepath, CREATED_CHANGE, change.file.objectName)))
 		} else {
 			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n", change.removal.filepath, REMOVAL_CHANGE)))
 		}
@@ -215,8 +224,10 @@ func (repository *Repository) writeSave(save *CheckPoint) string {
 	errors.Check(err)
 
 	for _, change := range save.changes {
-		if change.changeType == Modified {
-			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.modified.filepath, MODIFIED_CHANGE, change.modified.objectName)))
+		if change.changeType == Modification {
+			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.file.filepath, MODIFIED_CHANGE, change.file.objectName)))
+		} else if change.changeType == Creation {
+			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.file.filepath, CREATED_CHANGE, change.file.objectName)))
 		} else {
 			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n", change.removal.filepath, REMOVAL_CHANGE)))
 		}
@@ -257,11 +268,11 @@ func (repository *Repository) writeHead(name string) {
 
 func (repository *Repository) findStagedChangeIdx(filepath string) int {
 	return collections.FindIndex(repository.index, func(item *Change, _ int) bool {
-		if item.changeType == Modified {
-			return item.modified.filepath == filepath
+		if item.changeType == Removal {
+			return item.removal.filepath == filepath
 		}
 
-		return item.removal.filepath == filepath
+		return item.file.filepath == filepath
 	})
 }
 
@@ -296,10 +307,10 @@ func (repository *Repository) GetStatus() *Status {
 	}
 
 	for _, change := range repository.index {
-		if change.changeType == Modified {
-			trackedPaths.Insert(change.modified.filepath)
-		} else {
+		if change.changeType == Removal {
 			trackedPaths.Insert(change.removal.filepath)
+		} else {
+			trackedPaths.Insert(change.file.filepath)
 		}
 	}
 
@@ -348,18 +359,18 @@ func (repository *Repository) GetStatus() *Status {
 		fileHash := hex.EncodeToString(hasher.Sum(nil))
 
 		if stagedChange != nil {
-			if stagedChange.changeType == Modified {
+			if stagedChange.changeType == Removal {
+				status.Staged.RemovedFilePaths = append(status.Staged.RemovedFilePaths, stagedChange.removal.filepath)
+			} else {
 				if savedFile == nil {
 					status.Staged.CreatedFilesPaths = append(status.Staged.CreatedFilesPaths, filepath)
 				} else {
 					status.Staged.ModifiedFilePaths = append(status.Staged.ModifiedFilePaths, filepath)
 				}
 
-				if stagedChange.modified.objectName != fileHash {
+				if stagedChange.file.objectName != fileHash {
 					status.WorkingDir.ModifiedFilePaths = append(status.WorkingDir.ModifiedFilePaths, filepath)
 				}
-			} else {
-				status.Staged.RemovedFilePaths = append(status.Staged.RemovedFilePaths, stagedChange.removal.filepath)
 			}
 		} else {
 			if savedFile.objectName != fileHash {
@@ -420,12 +431,17 @@ func readCheckpoint(file *os.File) *CheckPoint {
 			errors.Error("Invalid save format.")
 		}
 
-		if changeHeader[1] == MODIFIED_CHANGE {
-			change.changeType = Modified
-			change.modified = &File{}
-			change.modified.filepath = changeHeader[0]
+		if changeHeader[1] == MODIFIED_CHANGE || changeHeader[1] == CREATED_CHANGE {
+			if changeHeader[1] == MODIFIED_CHANGE {
+				change.changeType = Modification
+			} else {
+				change.changeType = Creation
+			}
+
+			change.file = &File{}
+			change.file.filepath = changeHeader[0]
 			scanner.Scan()
-			change.modified.objectName = scanner.Text()
+			change.file.objectName = scanner.Text()
 		} else {
 			change.changeType = Removal
 			change.removal = &FileRemoval{}
@@ -484,10 +500,10 @@ func buildDirFromSave(root string, save *Save) *Dir {
 		for _, change := range checkpoint.changes {
 			var normalizedPath string
 
-			if change.changeType == Modified {
-				normalizedPath = change.modified.filepath[len(root)+1:]
-			} else {
+			if change.changeType == Removal {
 				normalizedPath = change.removal.filepath[len(root)+1:]
+			} else {
+				normalizedPath = change.file.filepath[len(root)+1:]
 			}
 
 			dir.addNode(normalizedPath, change)
@@ -616,8 +632,8 @@ func (repository *Repository) Load(ref string, path string) error {
 
 			var filepath string
 
-			if change.changeType == Modified {
-				filepath = change.modified.filepath
+			if change.changeType == Modification {
+				filepath = change.file.filepath
 			} else {
 				filepath = change.removal.filepath
 			}
@@ -634,11 +650,11 @@ func (repository *Repository) Load(ref string, path string) error {
 				continue
 			}
 
-			if change.changeType == Modified {
+			if change.changeType == Modification {
 				// should override history file and remove modification from the index
 
-				nodes[nodeIdx] = &Node{nodeType: FileType, file: change.modified}
-				filesRemovedFromIndex = append(filesRemovedFromIndex, change.modified)
+				nodes[nodeIdx] = &Node{nodeType: FileType, file: change.file}
+				filesRemovedFromIndex = append(filesRemovedFromIndex, change.file)
 				repository.index = slices.Delete(repository.index, idx, idx+1)
 			} else {
 				// should remove removal change from the index

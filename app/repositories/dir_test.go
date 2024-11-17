@@ -17,7 +17,7 @@ func TestAddNode(t *testing.T) {
 		children: make(map[string]*Node),
 	}
 
-	dir.addNode("a.txt", &Change{changeType: Modified, modified: &File{filepath: "home/project/a.txt"}})
+	dir.addNode("a.txt", &Change{changeType: Modification, file: &File{filepath: "home/project/a.txt"}})
 
 	assert.Equal(t, dir.path, path.Join("home", "project"))
 	assert.Equal(t, len(dir.children), 1)
@@ -30,14 +30,14 @@ func TestAddNodeNestedPath(t *testing.T) {
 		children: make(map[string]*Node),
 	}
 
-	dir.addNode("1.txt", &Change{changeType: Modified, modified: &File{filepath: "home/project/1.txt"}})
-	dir.addNode(fmt.Sprintf("a%s2.txt", PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/2.txt"}})
-	dir.addNode(fmt.Sprintf("a%s3.txt", PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/3.txt"}})
-	dir.addNode(fmt.Sprintf("a%sb%s4.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/b/4.txt"}})
-	dir.addNode(fmt.Sprintf("a%sb%s5.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/b/5.txt"}})
-	dir.addNode(fmt.Sprintf("a%sb%s6.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/b/6.txt"}})
-	dir.addNode(fmt.Sprintf("a%sc%s7.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/c/7.txt"}})
-	dir.addNode(fmt.Sprintf("a%sc%s8.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/c/8.txt"}})
+	dir.addNode("1.txt", &Change{changeType: Modification, file: &File{filepath: "home/project/1.txt"}})
+	dir.addNode(fmt.Sprintf("a%s2.txt", PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/2.txt"}})
+	dir.addNode(fmt.Sprintf("a%s3.txt", PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/3.txt"}})
+	dir.addNode(fmt.Sprintf("a%sb%s4.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/b/4.txt"}})
+	dir.addNode(fmt.Sprintf("a%sb%s5.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/b/5.txt"}})
+	dir.addNode(fmt.Sprintf("a%sb%s6.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/b/6.txt"}})
+	dir.addNode(fmt.Sprintf("a%sc%s7.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/c/7.txt"}})
+	dir.addNode(fmt.Sprintf("a%sc%s8.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/c/8.txt"}})
 
 	assert.Equal(t, dir.path, path.Join("home", "project"))
 	assert.Equal(t, len(dir.children), 2)
@@ -65,8 +65,8 @@ func TestAddNodeRemovalChanges(t *testing.T) {
 		children: make(map[string]*Node),
 	}
 
-	dir.addNode("a.txt", &Change{changeType: Modified, modified: &File{filepath: "home/project/a.txt"}})
-	dir.addNode("b.txt", &Change{changeType: Modified, modified: &File{filepath: "home/project/b.txt"}})
+	dir.addNode("a.txt", &Change{changeType: Modification, file: &File{filepath: "home/project/a.txt"}})
+	dir.addNode("b.txt", &Change{changeType: Modification, file: &File{filepath: "home/project/b.txt"}})
 	dir.addNode("a.txt", &Change{changeType: Removal, removal: &FileRemoval{filepath: "home/project/a.txt"}})
 	dir.addNode("c.txt", &Change{changeType: Removal, removal: &FileRemoval{filepath: "home/project/c.txt"}})
 
@@ -81,9 +81,9 @@ func TestAddNodeOverrideRemovalChanges(t *testing.T) {
 		children: make(map[string]*Node),
 	}
 
-	dir.addNode("a.txt", &Change{changeType: Modified, modified: &File{filepath: "home/project/a.txt", objectName: "old-version"}})
+	dir.addNode("a.txt", &Change{changeType: Modification, file: &File{filepath: "home/project/a.txt", objectName: "old-version"}})
 	dir.addNode("a.txt", &Change{changeType: Removal, removal: &FileRemoval{filepath: "home/project/a.txt"}})
-	dir.addNode("a.txt", &Change{changeType: Modified, modified: &File{filepath: "home/project/a.txt", objectName: "newer-version"}})
+	dir.addNode("a.txt", &Change{changeType: Modification, file: &File{filepath: "home/project/a.txt", objectName: "newer-version"}})
 
 	assert.Equal(t, dir.path, path.Join("home", "project"))
 	assert.Equal(t, len(dir.children), 1)
@@ -132,14 +132,14 @@ func TestAddNodeRemovalChangesNestedPath(t *testing.T) {
 		children: make(map[string]*Node),
 	}
 
-	dir.addNode("1.txt", &Change{changeType: Modified, modified: &File{filepath: "home/project/1.txt"}})
-	dir.addNode(fmt.Sprintf("a%s2.txt", PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/2.txt"}})
-	dir.addNode(fmt.Sprintf("a%s3.txt", PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/3.txt"}})
-	dir.addNode(fmt.Sprintf("a%sb%s4.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/b/4.txt"}})
-	dir.addNode(fmt.Sprintf("a%sb%s5.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/b/5.txt"}})
-	dir.addNode(fmt.Sprintf("a%sb%s6.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/b/6.txt"}})
-	dir.addNode(fmt.Sprintf("a%sc%s7.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/c/7.txt"}})
-	dir.addNode(fmt.Sprintf("a%sc%s8.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/c/8.txt"}})
+	dir.addNode("1.txt", &Change{changeType: Modification, file: &File{filepath: "home/project/1.txt"}})
+	dir.addNode(fmt.Sprintf("a%s2.txt", PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/2.txt"}})
+	dir.addNode(fmt.Sprintf("a%s3.txt", PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/3.txt"}})
+	dir.addNode(fmt.Sprintf("a%sb%s4.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/b/4.txt"}})
+	dir.addNode(fmt.Sprintf("a%sb%s5.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/b/5.txt"}})
+	dir.addNode(fmt.Sprintf("a%sb%s6.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/b/6.txt"}})
+	dir.addNode(fmt.Sprintf("a%sc%s7.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/c/7.txt"}})
+	dir.addNode(fmt.Sprintf("a%sc%s8.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/c/8.txt"}})
 
 	assert.Equal(t, dir.path, path.Join("home", "project"))
 	assert.Equal(t, len(dir.children), 2)
@@ -182,7 +182,7 @@ func TestAddNodeRemovalChangesNestedPath(t *testing.T) {
 	_, ok = dir.children["a"].dir.children["c"].dir.children["8.txt"]
 	assert.False(t, ok)
 
-	dir.addNode(fmt.Sprintf("a%sc%s8.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modified, modified: &File{filepath: "home/project/a/c/8.txt", objectName: "newer-version"}})
+	dir.addNode(fmt.Sprintf("a%sc%s8.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{changeType: Modification, file: &File{filepath: "home/project/a/c/8.txt", objectName: "newer-version"}})
 
 	assert.Equal(t, len(dir.children), 2)
 	assert.Equal(t, dir.children["1.txt"].file, &File{filepath: "home/project/1.txt"})
