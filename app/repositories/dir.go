@@ -20,22 +20,28 @@ func (root *Dir) addNodeHelper(segments []string, change *Change) {
 	}
 
 	var node *Node
-	subdirName := segments[0]
+	dirNodeName := segments[0]
 
-	if _, ok := root.children[subdirName]; ok {
-		node = root.children[subdirName]
+	if _, ok := root.children[dirNodeName]; ok {
+		node = root.children[dirNodeName]
 	} else {
 		node = &Node{
 			nodeType: DirType,
 			dir: &Dir{
-				path:     fp.Join(root.path, subdirName),
+				path:     fp.Join(root.path, dirNodeName),
 				children: make(map[string]*Node),
 			},
 		}
-		root.children[subdirName] = node
+		root.children[dirNodeName] = node
 	}
 
 	node.dir.addNodeHelper(segments[1:], change)
+
+	if len(node.dir.children) == 0 {
+		// If we remove all entries from a directory, then we dont need it anymore.
+		// This is ensure we dont restore an empty directory.
+		delete(root.children, dirNodeName)
+	}
 }
 
 func (root *Dir) addNode(path string, change *Change) {
