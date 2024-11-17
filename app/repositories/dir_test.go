@@ -90,6 +90,42 @@ func TestAddNodeOverrideRemovalChanges(t *testing.T) {
 	assert.Equal(t, dir.children["a.txt"].file, &File{filepath: "home/project/a.txt", objectName: "newer-version"})
 }
 
+func TestAddNodeRemovalChangesRemovesEmptyDir(t *testing.T) {
+	dir := &Dir{
+		path: path.Join("home", "project"),
+		children: map[string]*Node{
+			"dir": {
+				nodeType: DirType,
+				dir: &Dir{
+					path: path.Join("home", "project", "dir"),
+					children: map[string]*Node{
+						"a.txt": {
+							nodeType: FileType,
+							file: &File{
+								"home/project/dir/a.txt",
+								"object-a",
+							},
+						},
+						"b.txt": {
+							nodeType: FileType,
+							file: &File{
+								"home/project/dir/b.txt",
+								"object-b",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	dir.addNode(path.Join("dir", "a.txt"), &Change{changeType: Removal, removal: &FileRemoval{filepath: "home/project/dir/a.txt"}})
+	assert.Equal(t, len(dir.children), 1)
+	assert.Equal(t, dir.children["dir"].nodeType, DirType)
+	dir.addNode(path.Join("dir", "b.txt"), &Change{changeType: Removal, removal: &FileRemoval{filepath: "home/project/dir/b.txt"}})
+	assert.Equal(t, len(dir.children), 0)
+}
+
 func TestAddNodeRemovalChangesNestedPath(t *testing.T) {
 	dir := &Dir{
 		path:     path.Join("home", "project"),
