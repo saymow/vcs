@@ -761,8 +761,11 @@ func TestLoadHeadDir(t *testing.T) {
 			fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 updated content."))
 			fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
 			fixtureWriteFile(dir.Join("newfile.txt"), []byte("new file content."))
+			fixtureMakeDirs(dir.Join("dir1"), dir.Join("dir1", "dir2"), dir.Join("dir1", "dir2", "dir3"))
+			fixtureWriteFile(dir.Join("dir1", "dir2", "dir3", "10.txt"), []byte("file 10 original content."))
 
 			repository = GetRepository(dir.Path())
+			repository.IndexFile(path.Join("dir1", "dir2", "dir3", "10.txt"))
 			repository.RemoveFile(dir.Join("c", "8.txt"))
 			repository.SaveIndex()
 
@@ -788,6 +791,16 @@ func TestLoadHeadDir(t *testing.T) {
 								fs.WithFile("6.txt", "file 6 original content."),
 							)),
 						fs.WithDir("c", fs.WithFile("8.txt", "file 8 original content.")),
+						fs.WithDir(
+							"dir1",
+							fs.WithDir(
+								"dir2",
+								fs.WithDir(
+									"dir3",
+									fs.WithFile("10.txt", "file 10 original content."),
+								),
+							),
+						),
 					),
 				),
 			)
