@@ -573,7 +573,13 @@ func (repository *Repository) safeRemoveDir(dir *Dir) {
 
 }
 
-func (repository *Repository) Restore(ref string, path string) error {
+// Load cover 2 usecases:
+//
+//  1. Restore HEAD + index changes (...and remove the index change).
+//
+//     It can be used to restore the current head + index changes. Index changes
+//     have higher priorities.
+func (repository *Repository) Load(ref string, path string) error {
 	save := repository.getSave(ref)
 	if save == nil {
 		return &ValidationError{fmt.Sprintf("\"%s\" is an invalid ref.", ref)}
