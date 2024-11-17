@@ -372,57 +372,28 @@ func TestAllCollectFiles(t *testing.T) {
 	)
 }
 
-func TestCollectFiles(t *testing.T) {
+// Since it's we cannot rely on the sequence the of the map iteration, the test becomes
+// hard. This is the reason there are only file nodes on the last dir node.
+// This teste ensure that the nodes are indeed collected in pre order.
+func TestPreOrderTraversal(t *testing.T) {
 	dir := &Dir{
+		path: "",
 		children: map[string]*Node{
-			"a.txt": {
-				nodeType: FileType,
-				file: &File{
-					"home/project/a.txt",
-					"1",
-				},
-			},
-			"b.txt": {
-				nodeType: FileType,
-				file: &File{
-					"home/project/b.txt",
-					"2",
-				},
-			},
 			"subdir": {
 				nodeType: DirType,
 				dir: &Dir{
+					path: "subdir",
 					children: map[string]*Node{
-						"a.txt": {
-							nodeType: FileType,
-							file: &File{
-								"home/project/subdir/a.txt",
-								"3",
-							},
-						},
-						"c.txt": {
-							nodeType: FileType,
-							file: &File{
-								"home/project/subdir/c.txt",
-								"4",
-							},
-						},
 						"nested-subdir": {
 							nodeType: DirType,
 							dir: &Dir{
+								path: path.Join("subdir", "nested-subdir"),
 								children: map[string]*Node{
 									"b.txt": {
 										nodeType: FileType,
 										file: &File{
 											"home/project/subdir/nested-subdir/b.txt",
 											"5",
-										},
-									},
-									"d.txt": {
-										nodeType: FileType,
-										file: &File{
-											"home/project/subdir/nested-subdir/d.txt",
-											"6",
 										},
 									},
 								},
@@ -434,44 +405,22 @@ func TestCollectFiles(t *testing.T) {
 		},
 	}
 
-	received := dir.collectFiles("subdir")
-	sort.Slice(received, func(i, j int) bool { return received[i].objectName < received[j].objectName })
+	received := dir.preOrderTraversal()
 
-	assert.Equal(t,
-		received,
-		[]*File{
-			{
-				"home/project/subdir/a.txt",
-				"3",
-			},
-			{
-				"home/project/subdir/c.txt",
-				"4",
-			},
-			{
+	assert.EqualValues(t, len(received), 4)
+	assert.EqualValues(t, received[0].nodeType, DirType)
+	assert.EqualValues(t, received[0].dir.path, "")
+	assert.EqualValues(t, received[1].nodeType, DirType)
+	assert.EqualValues(t, received[1].dir.path, "subdir")
+	assert.EqualValues(t, received[2].nodeType, DirType)
+	assert.EqualValues(t, received[2].dir.path, path.Join("subdir", "nested-subdir"))
+	assert.EqualValues(t,
+		received[3],
+		&Node{
+			nodeType: FileType,
+			file: &File{
 				"home/project/subdir/nested-subdir/b.txt",
 				"5",
-			},
-			{
-				"home/project/subdir/nested-subdir/d.txt",
-				"6",
-			},
-		},
-	)
-
-	received = dir.collectFiles(path.Join("subdir", "nested-subdir"))
-	sort.Slice(received, func(i, j int) bool { return received[i].objectName < received[j].objectName })
-
-	assert.Equal(t,
-		received,
-		[]*File{
-			{
-				"home/project/subdir/nested-subdir/b.txt",
-				"5",
-			},
-			{
-				"home/project/subdir/nested-subdir/d.txt",
-				"6",
 			},
 		},
 	)
