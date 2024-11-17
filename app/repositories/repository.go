@@ -545,6 +545,34 @@ func (repository *Repository) applyNode(node *Node) {
 	errors.Check(err)
 }
 
+func (repository *Repository) safeRemoveDir(dir *Dir) {
+	if dir.path != repository.root {
+		err := os.RemoveAll(dir.path)
+		errors.Check(err)
+		return
+	}
+
+	entries, err := os.ReadDir(repository.root)
+	errors.Check(err)
+
+	for _, entry := range entries {
+		if entry.Name() == REPOSITORY_FOLDER_NAME {
+			continue
+		}
+
+		filepath := Path.Join(repository.root, entry.Name())
+
+		if entry.IsDir() {
+			err := os.RemoveAll(filepath)
+			errors.Check(err)
+		} else {
+			err := os.Remove(filepath)
+			errors.Check(err)
+		}
+	}
+
+}
+
 func (repository *Repository) Restore(ref string, path string) error {
 	save := repository.getSave(ref)
 	if save == nil {
@@ -552,7 +580,6 @@ func (repository *Repository) Restore(ref string, path string) error {
 	}
 
 	rootDir := buildDirFromSave(repository.root, save)
-
 	node := rootDir.findNode(path)
 	if node == nil {
 		return &ValidationError{fmt.Sprintf("\"%s\" is a invalid path.", ref)}
@@ -563,6 +590,13 @@ func (repository *Repository) Restore(ref string, path string) error {
 
 	if node.nodeType == DirType {
 		nodes = node.dir.preOrderTraversal()
+
+		if node.dir == rootDir {
+			// if we are traversing the root dir, the root-dir-file is included in the response.
+			// this removes it, since we dont want to recreate the entire dir.
+
+			nodes = nodes[1:]
+		}
 	} else {
 		nodes = append(nodes, node)
 	}
@@ -609,14 +643,11 @@ func (repository *Repository) Restore(ref string, path string) error {
 	}
 
 	if node.nodeType == DirType {
-		err := os.RemoveAll(node.dir.path)
-		errors.Check(err)
+		repository.safeRemoveDir(node.dir)
 	}
-
 	for _, node := range nodes {
 		repository.applyNode(node)
 	}
-
 	for _, fileRemoved := range filesRemovedFromIndex {
 		repository.removeObject(fileRemoved.objectName)
 	}
