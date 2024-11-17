@@ -561,6 +561,9 @@ func (repository *Repository) applyNode(node *Node) {
 	errors.Check(err)
 }
 
+// Safely remove a directory
+//
+// This helper prevents the .repository dir to be removed
 func (repository *Repository) safeRemoveDir(dir *Dir) {
 	if dir.path != repository.root {
 		err := os.RemoveAll(dir.path)
@@ -586,7 +589,6 @@ func (repository *Repository) safeRemoveDir(dir *Dir) {
 			errors.Check(err)
 		}
 	}
-
 }
 
 // Load cover 2 usecases:
@@ -595,6 +597,8 @@ func (repository *Repository) safeRemoveDir(dir *Dir) {
 //
 //     It can be used to restore the current head + index changes. Index changes
 //     have higher priorities.
+//
+//  2. Load all the content saved up until all checkpoints created.
 func (repository *Repository) Load(ref string, path string) error {
 	save := repository.getSave(ref)
 	if save == nil {
@@ -602,74 +606,83 @@ func (repository *Repository) Load(ref string, path string) error {
 	}
 
 	rootDir := buildDirFromSave(repository.root, save)
+
 	node := rootDir.findNode(path)
 	if node == nil {
 		return &ValidationError{fmt.Sprintf("\"%s\" is a invalid path.", ref)}
 	}
 
-	nodes := []*Node{}
 	filesRemovedFromIndex := []*File{}
 
+	if ref == "HEAD" {
+		// Index files have higher priority over tree files to be restored
+
+		if node.nodeType == FileType {
+			// Check if there is a index modification for the node
+
+			stagedChangeIdx := repository.findStagedChangeIdx(node.file.filepath)
+
+			if stagedChangeIdx != -1 {
+				// If so, remove the change from the index
+
+				if repository.index[stagedChangeIdx].changeType != Removal {
+					// If it is a file modification, the index modification is applied instead of the tree one.
+
+					node = &Node{nodeType: FileType, file: repository.index[stagedChangeIdx].file}
+					filesRemovedFromIndex = append(filesRemovedFromIndex, repository.index[stagedChangeIdx].file)
+				}
+
+				repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
+			}
+		} else {
+			// For directories we should iterate over the index and rebuild the node dir, if necessary,
+			// applying the index priority.
+
+			for _, change := range slices.Clone(repository.index) {
+				var filepath string
+
+				if change.changeType == Removal {
+					filepath = change.removal.filepath
+				} else {
+					filepath = change.file.filepath
+				}
+
+				if !strings.HasPrefix(filepath, node.dir.path) {
+					continue
+				}
+
+				if change.changeType != Removal {
+					normalizedPath := filepath[len(node.dir.path)+1:]
+					node.dir.addNode(normalizedPath, change)
+
+					filesRemovedFromIndex = append(filesRemovedFromIndex, change.file)
+				}
+
+				repository.index = collections.Remove(repository.index, func(item *Change, _ int) bool {
+					return item == change
+				})
+			}
+		}
+	}
+
 	if node.nodeType == DirType {
-		nodes = node.dir.preOrderTraversal()
+		nodes := node.dir.preOrderTraversal()
 
 		if node.dir == rootDir {
 			// if we are traversing the root dir, the root-dir-file is included in the response.
-			// this removes it, since we dont want to recreate the entire dir.
 
 			nodes = nodes[1:]
 		}
-	} else {
-		nodes = append(nodes, node)
-	}
 
-	if ref == "HEAD" {
-		// index files have higher priority over tree files to be restored
-
-		for idx, change := range slices.Clone(repository.index) {
-			// might the time of O(nm) become a problem?
-			// idk, we reading and writing a lot on the disk, this is irrelevant.
-
-			var filepath string
-
-			if change.changeType == Modification {
-				filepath = change.file.filepath
-			} else {
-				filepath = change.removal.filepath
-			}
-
-			nodeIdx := collections.FindIndex(nodes, func(node *Node, _ int) bool {
-				if node.nodeType == DirType {
-					return false
-				}
-
-				return node.file.filepath == filepath
-			})
-
-			if nodeIdx == -1 {
-				continue
-			}
-
-			if change.changeType == Modification {
-				// should override history file and remove modification from the index
-
-				nodes[nodeIdx] = &Node{nodeType: FileType, file: change.file}
-				filesRemovedFromIndex = append(filesRemovedFromIndex, change.file)
-				repository.index = slices.Delete(repository.index, idx, idx+1)
-			} else {
-				// should remove removal change from the index
-
-				repository.index = slices.Delete(repository.index, idx, idx+1)
-			}
-		}
-	}
-
-	if node.nodeType == DirType {
 		repository.safeRemoveDir(node.dir)
-	}
-	for _, node := range nodes {
+
+		for _, node := range nodes {
+			repository.applyNode(node)
+		}
+	} else {
 		repository.applyNode(node)
 	}
+
 	for _, fileRemoved := range filesRemovedFromIndex {
 		repository.removeObject(fileRemoved.objectName)
 	}

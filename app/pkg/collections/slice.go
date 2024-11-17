@@ -1,5 +1,7 @@
 package collections
 
+import "slices"
+
 func FindIndex[T comparable](slice []T, callback func(T, int) bool) int {
 	for idx, element := range slice {
 		if callback(element, idx) {
@@ -10,12 +12,11 @@ func FindIndex[T comparable](slice []T, callback func(T, int) bool) int {
 	return -1
 }
 
-func ToMap[T any, G comparable](slice []T, keyExtractor func(T, int) G) map[G]T {
-	myMap := make(map[G]T)
-
-	for idx, element := range slice {
-		myMap[keyExtractor(element, idx)] = element
+func Remove[T comparable](slice []T, callback func(T, int) bool) []T {
+	idx := FindIndex(slice, callback)
+	if idx == -1 {
+		return slice
 	}
 
-	return myMap
+	return slices.Delete(slice, idx, idx+1)
 }
