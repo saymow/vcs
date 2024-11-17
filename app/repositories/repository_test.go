@@ -697,3 +697,42 @@ func TestRestoreHeadSingleFile(t *testing.T) {
 		testifyAssert.Equal(t, fixtureReadFile(dir.Join("2.txt")), "the original content.")
 	}
 }
+
+func TestRestoreHeadDir(t *testing.T) {
+	dir, repository := fixtureGetBaseProject(t)
+	defer dir.Remove()
+
+	// Check for files changed and removed (untracked files should be deleted)
+	{
+		// Setup
+
+		fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 original content."))
+		fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 original content."))
+
+		repository.IndexFile(dir.Join("a", "4.txt"))
+		repository.IndexFile(dir.Join("a", "b", "6.txt"))
+		repository.SaveIndex()
+		repository.CreateSave("initial save")
+
+		fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 updated content."))
+
+		repository = GetRepository(dir.Path())
+		repository.Restore("HEAD", "a")
+
+		// Test
+
+		assert.Assert(
+			t,
+			fs.Equal(
+				dir.Join("a"),
+				fs.Expected(
+					t,
+					fs.WithFile("4.txt", "file 4 original content."),
+					fs.WithDir("b",
+						fs.WithFile("6.txt", "file 6 original content."),
+					),
+				),
+			),
+		)
+	}
+}
