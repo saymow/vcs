@@ -171,6 +171,13 @@ func fixtureWriteFile(filepath string, content []byte) {
 	errors.Check(err)
 }
 
+func fixtureMakeDirs(filepaths ...string) {
+	for _, filepath := range filepaths {
+		err := os.Mkdir(filepath, 0644)
+		errors.Check(err)
+	}
+}
+
 func fixtureRemoveFile(filepath string) {
 	err := os.Remove(filepath)
 	errors.Check(err)

@@ -784,3 +784,204 @@ func TestRestoreHeadDir(t *testing.T) {
 		)
 	}
 }
+
+func TestRestoreHistory(t *testing.T) {
+	dir, repository := fixtureGetBaseProject(t)
+	defer dir.Remove()
+
+	// Check for files changed and removed - root (untracked files should be deleted)
+	{
+		// Setup
+
+		// Save 0 Changes
+
+		fixtureWriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0)."))
+		fixtureWriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0)."))
+		fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
+		fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
+		fixtureWriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
+
+		repository.IndexFile(dir.Join("1.txt"))
+		repository.IndexFile(dir.Join("2.txt"))
+		repository.IndexFile(dir.Join("a", "4.txt"))
+		repository.IndexFile(dir.Join("a", "b", "6.txt"))
+		repository.IndexFile(dir.Join("c", "8.txt"))
+		repository.SaveIndex()
+		save0 := repository.CreateSave("SAVE 0")
+
+		// Save 1 Changes
+
+		repository = GetRepository(dir.Path())
+
+		fixtureWriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1)."))
+
+		repository.IndexFile(dir.Join("2.txt"))
+		repository.SaveIndex()
+		repository.CreateSave("SAVE 1")
+
+		// Save 2 Changes
+
+		repository = GetRepository(dir.Path())
+
+		fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0) (SAVE 2)."))
+
+		repository.IndexFile(dir.Join("a", "4.txt"))
+		repository.SaveIndex()
+		repository.CreateSave("SAVE 2")
+
+		// Save 3 Changes
+
+		repository = GetRepository(dir.Path())
+
+		fixtureWriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1) (SAVE 3)."))
+		fixtureMakeDirs(dir.Join("dir1"), dir.Join("dir1", "dir2"), dir.Join("dir1", "dir2", "dir3"), dir.Join("dir1", "dir2", "dir3", "dir4"))
+		fixtureWriteFile(dir.Join("dir1", "10.txt"), []byte("file 10 (SAVE 3)."))
+		fixtureWriteFile(dir.Join("dir1", "dir2", "11.txt"), []byte("file 11 (SAVE 3)."))
+		fixtureWriteFile(dir.Join("dir1", "dir2", "dir3", "12.txt"), []byte("file 12 (SAVE 3)."))
+		fixtureWriteFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"), []byte("file 13 (SAVE 3)."))
+
+		repository.IndexFile(dir.Join("2.txt"))
+		repository.IndexFile(dir.Join("dir1", "10.txt"))
+		repository.IndexFile(dir.Join("dir1", "dir2", "11.txt"))
+		repository.IndexFile(dir.Join("dir1", "dir2", "dir3", "12.txt"))
+		repository.IndexFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"))
+		repository.SaveIndex()
+		save3 := repository.CreateSave("SAVE 3")
+
+		// Save 4 Changes
+
+		repository = GetRepository(dir.Path())
+
+		fixtureWriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0) (SAVE 4)."))
+		fixtureWriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1) (SAVE 3) (SAVE 4)."))
+		fixtureWriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0) (SAVE 2) (SAVE 4)."))
+		fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0) (SAVE 4)."))
+		fixtureWriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0) (SAVE 4)."))
+
+		repository.RemoveFile(dir.Join("dir1", "10.txt"))
+		repository.RemoveFile(dir.Join("dir1", "dir2", "11.txt"))
+		repository.RemoveFile(dir.Join("dir1", "dir2", "dir3", "12.txt"))
+		repository.RemoveFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"))
+		repository.IndexFile(dir.Join("1.txt"))
+		repository.IndexFile(dir.Join("2.txt"))
+		repository.IndexFile(dir.Join("a", "4.txt"))
+		repository.IndexFile(dir.Join("a", "b", "6.txt"))
+		repository.IndexFile(dir.Join("c", "8.txt"))
+		repository.SaveIndex()
+		repository.CreateSave("SAVE 4")
+
+		// Save 5 Changes
+
+		repository = GetRepository(dir.Path())
+
+		repository.RemoveFile(dir.Join("1.txt"))
+		repository.RemoveFile(dir.Join("2.txt"))
+		repository.RemoveFile(dir.Join("a", "4.txt"))
+		repository.SaveIndex()
+		save5 := repository.CreateSave("SAVE 5")
+
+		// Working dir changes
+
+		repository = GetRepository(dir.Path())
+
+		fixtureWriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
+		fixtureWriteFile(dir.Join("newfile.txt"), []byte("new file content."))
+
+		// Test Save 3
+
+		repository = GetRepository(dir.Path())
+		repository.Restore(save3.id, "")
+
+		assert.Assert(
+			t,
+			fs.Equal(
+				dir.Path(),
+				fs.Expected(
+					t,
+					fs.WithDir(REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+					fs.WithFile("1.txt", "file 1 (SAVE 0)."),
+					fs.WithFile("2.txt", "file 2 (SAVE 0) (SAVE 1) (SAVE 3)."),
+					fs.WithDir(
+						"a",
+						fs.WithFile("4.txt", "file 4 (SAVE 0) (SAVE 2)."),
+						fs.WithDir("b",
+							fs.WithFile("6.txt", "file 6 (SAVE 0)."),
+						)),
+					fs.WithDir(
+						"c",
+						fs.WithFile("8.txt", "file 8 (SAVE 0)."),
+					),
+					fs.WithDir(
+						"dir1",
+						fs.WithFile("10.txt", "file 10 (SAVE 3)."),
+						fs.WithDir(
+							"dir2",
+							fs.WithFile("11.txt", "file 11 (SAVE 3)."),
+							fs.WithDir(
+								"dir3",
+								fs.WithFile("12.txt", "file 12 (SAVE 3)."),
+								fs.WithDir(
+									"dir4",
+									fs.WithFile("13.txt", "file 13 (SAVE 3)."),
+								),
+							),
+						),
+					),
+				),
+			),
+		)
+
+		// Test Save 0
+
+		repository = GetRepository(dir.Path())
+		repository.Restore(save0.id, "")
+
+		assert.Assert(
+			t,
+			fs.Equal(
+				dir.Path(),
+				fs.Expected(
+					t,
+					fs.WithDir(REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+					fs.WithFile("1.txt", "file 1 (SAVE 0)."),
+					fs.WithFile("2.txt", "file 2 (SAVE 0)."),
+					fs.WithDir(
+						"a",
+						fs.WithFile("4.txt", "file 4 (SAVE 0)."),
+						fs.WithDir("b",
+							fs.WithFile("6.txt", "file 6 (SAVE 0)."),
+						)),
+					fs.WithDir(
+						"c",
+						fs.WithFile("8.txt", "file 8 (SAVE 0)."),
+					),
+				),
+			),
+		)
+
+		// Test Save 5
+
+		repository = GetRepository(dir.Path())
+		repository.Restore(save5.id, "")
+
+		assert.Assert(
+			t,
+			fs.Equal(
+				dir.Path(),
+				fs.Expected(
+					t,
+					fs.WithDir(REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+					fs.WithDir(
+						"a",
+						fs.WithDir("b",
+							fs.WithFile("6.txt", "file 6 (SAVE 0) (SAVE 4)."),
+						)),
+					fs.WithDir(
+						"c",
+						fs.WithFile("8.txt", "file 8 (SAVE 0) (SAVE 4)."),
+					),
+				),
+			),
+		)
+	}
+}
