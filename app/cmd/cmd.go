@@ -19,10 +19,12 @@ var CLI struct {
 		Message string `arg:"" name:"message" help:"Save message."`
 	} `cmd:"" help:"Create a save point."`
 	Status struct {
-	} `cmd:"" help:"Check the repository status."`
+	} `cmd:"" help:"Show the repository status."`
 	Restore struct {
 		Path string `arg:"" name:"path" help:"Path to be restored."`
 	} `cmd:"" help:"Restore files from index or file tree."`
+	Logs struct {
+	} `cmd:"" help:"Show the repository saves logs."`
 }
 
 func Start() {
@@ -31,6 +33,10 @@ func Start() {
 	switch ctx.Command() {
 	case "init":
 		handlers.Init()
+	case "status":
+		handlers.Status()
+	case "logs":
+		handlers.Logs()
 	case "add <path>":
 		handlers.TrackFiles(ctx.Args[1:])
 	case "rm <path>":
@@ -39,8 +45,6 @@ func Start() {
 		handlers.Save(ctx.Args[1])
 	case "restore <path>":
 		handlers.Restore(ctx.Args[1])
-	case "status":
-		handlers.Status()
 	default:
 		panic(ctx.Command())
 	}
