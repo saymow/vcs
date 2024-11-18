@@ -880,7 +880,7 @@ func TestLoadHeadDir(t *testing.T) {
 func TestLoadHistoryUnsavedChanges(t *testing.T) {
 	dir, repository := fixtureGetBaseProject(t)
 	defer dir.Remove()
-	var save *filesystem.CheckPoint
+	var save *filesystem.Checkpoint
 
 	// Setup
 	{
@@ -928,208 +928,296 @@ func TestLoadHistory(t *testing.T) {
 	dir, repository := fixtureGetBaseProject(t)
 	defer dir.Remove()
 
-	// Check for files changed and removed - root (untracked files should be deleted)
+	var save0 *filesystem.Checkpoint
+	var save3 *filesystem.Checkpoint
+	var save5 *filesystem.Checkpoint
+
+	// Setup
 	{
-		var save0 *filesystem.CheckPoint
-		var save3 *filesystem.CheckPoint
-		var save5 *filesystem.CheckPoint
+		// Save 0 Changes
 
-		// Setup
-		{
-			// Save 0 Changes
+		fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0)."))
+		fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0)."))
+		fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
+		fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
+		fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
 
-			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0)."))
-			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0)."))
-			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
-			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
-			fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
+		fixtures.RemoveFile(dir.Join("3.txt"))
+		fixtures.RemoveFile(dir.Join("a", "5.txt"))
+		fixtures.RemoveFile(dir.Join("a", "b", "7.txt"))
+		fixtures.RemoveFile(dir.Join("c", "9.txt"))
 
-			fixtures.RemoveFile(dir.Join("3.txt"))
-			fixtures.RemoveFile(dir.Join("a", "5.txt"))
-			fixtures.RemoveFile(dir.Join("a", "b", "7.txt"))
-			fixtures.RemoveFile(dir.Join("c", "9.txt"))
+		repository.IndexFile(dir.Join("1.txt"))
+		repository.IndexFile(dir.Join("2.txt"))
+		repository.IndexFile(dir.Join("a", "4.txt"))
+		repository.IndexFile(dir.Join("a", "b", "6.txt"))
+		repository.IndexFile(dir.Join("c", "8.txt"))
+		repository.SaveIndex()
+		save0 = repository.CreateSave("SAVE 0")
 
-			repository.IndexFile(dir.Join("1.txt"))
-			repository.IndexFile(dir.Join("2.txt"))
-			repository.IndexFile(dir.Join("a", "4.txt"))
-			repository.IndexFile(dir.Join("a", "b", "6.txt"))
-			repository.IndexFile(dir.Join("c", "8.txt"))
-			repository.SaveIndex()
-			save0 = repository.CreateSave("SAVE 0")
+		// Save 1 Changes
 
-			// Save 1 Changes
+		repository = GetRepository(dir.Path())
 
-			repository = GetRepository(dir.Path())
+		fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1)."))
 
-			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1)."))
+		repository.IndexFile(dir.Join("2.txt"))
+		repository.SaveIndex()
+		repository.CreateSave("SAVE 1")
 
-			repository.IndexFile(dir.Join("2.txt"))
-			repository.SaveIndex()
-			repository.CreateSave("SAVE 1")
+		// Save 2 Changes
 
-			// Save 2 Changes
+		repository = GetRepository(dir.Path())
 
-			repository = GetRepository(dir.Path())
+		fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0) (SAVE 2)."))
 
-			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0) (SAVE 2)."))
+		repository.IndexFile(dir.Join("a", "4.txt"))
+		repository.SaveIndex()
+		repository.CreateSave("SAVE 2")
 
-			repository.IndexFile(dir.Join("a", "4.txt"))
-			repository.SaveIndex()
-			repository.CreateSave("SAVE 2")
+		// Save 3 Changes
 
-			// Save 3 Changes
+		repository = GetRepository(dir.Path())
 
-			repository = GetRepository(dir.Path())
+		fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1) (SAVE 3)."))
+		fixtures.MakeDirs(dir.Join("dir1"), dir.Join("dir1", "dir2"), dir.Join("dir1", "dir2", "dir3"), dir.Join("dir1", "dir2", "dir3", "dir4"))
+		fixtures.WriteFile(dir.Join("dir1", "10.txt"), []byte("file 10 (SAVE 3)."))
+		fixtures.WriteFile(dir.Join("dir1", "dir2", "11.txt"), []byte("file 11 (SAVE 3)."))
+		fixtures.WriteFile(dir.Join("dir1", "dir2", "dir3", "12.txt"), []byte("file 12 (SAVE 3)."))
+		fixtures.WriteFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"), []byte("file 13 (SAVE 3)."))
 
-			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1) (SAVE 3)."))
-			fixtures.MakeDirs(dir.Join("dir1"), dir.Join("dir1", "dir2"), dir.Join("dir1", "dir2", "dir3"), dir.Join("dir1", "dir2", "dir3", "dir4"))
-			fixtures.WriteFile(dir.Join("dir1", "10.txt"), []byte("file 10 (SAVE 3)."))
-			fixtures.WriteFile(dir.Join("dir1", "dir2", "11.txt"), []byte("file 11 (SAVE 3)."))
-			fixtures.WriteFile(dir.Join("dir1", "dir2", "dir3", "12.txt"), []byte("file 12 (SAVE 3)."))
-			fixtures.WriteFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"), []byte("file 13 (SAVE 3)."))
+		repository.IndexFile(dir.Join("2.txt"))
+		repository.IndexFile(dir.Join("dir1", "10.txt"))
+		repository.IndexFile(dir.Join("dir1", "dir2", "11.txt"))
+		repository.IndexFile(dir.Join("dir1", "dir2", "dir3", "12.txt"))
+		repository.IndexFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"))
+		repository.SaveIndex()
+		save3 = repository.CreateSave("SAVE 3")
 
-			repository.IndexFile(dir.Join("2.txt"))
-			repository.IndexFile(dir.Join("dir1", "10.txt"))
-			repository.IndexFile(dir.Join("dir1", "dir2", "11.txt"))
-			repository.IndexFile(dir.Join("dir1", "dir2", "dir3", "12.txt"))
-			repository.IndexFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"))
-			repository.SaveIndex()
-			save3 = repository.CreateSave("SAVE 3")
+		// Save 4 Changes
 
-			// Save 4 Changes
+		repository = GetRepository(dir.Path())
 
-			repository = GetRepository(dir.Path())
+		fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0) (SAVE 4)."))
+		fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1) (SAVE 3) (SAVE 4)."))
+		fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0) (SAVE 2) (SAVE 4)."))
+		fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0) (SAVE 4)."))
+		fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0) (SAVE 4)."))
 
-			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0) (SAVE 4)."))
-			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1) (SAVE 3) (SAVE 4)."))
-			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0) (SAVE 2) (SAVE 4)."))
-			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0) (SAVE 4)."))
-			fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0) (SAVE 4)."))
+		repository.RemoveFile(dir.Join("dir1", "10.txt"))
+		repository.RemoveFile(dir.Join("dir1", "dir2", "11.txt"))
+		repository.RemoveFile(dir.Join("dir1", "dir2", "dir3", "12.txt"))
+		repository.RemoveFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"))
+		repository.IndexFile(dir.Join("1.txt"))
+		repository.IndexFile(dir.Join("2.txt"))
+		repository.IndexFile(dir.Join("a", "4.txt"))
+		repository.IndexFile(dir.Join("a", "b", "6.txt"))
+		repository.IndexFile(dir.Join("c", "8.txt"))
+		repository.SaveIndex()
+		repository.CreateSave("SAVE 4")
 
-			repository.RemoveFile(dir.Join("dir1", "10.txt"))
-			repository.RemoveFile(dir.Join("dir1", "dir2", "11.txt"))
-			repository.RemoveFile(dir.Join("dir1", "dir2", "dir3", "12.txt"))
-			repository.RemoveFile(dir.Join("dir1", "dir2", "dir3", "dir4", "13.txt"))
-			repository.IndexFile(dir.Join("1.txt"))
-			repository.IndexFile(dir.Join("2.txt"))
-			repository.IndexFile(dir.Join("a", "4.txt"))
-			repository.IndexFile(dir.Join("a", "b", "6.txt"))
-			repository.IndexFile(dir.Join("c", "8.txt"))
-			repository.SaveIndex()
-			repository.CreateSave("SAVE 4")
+		// Save 5 Changes
 
-			// Save 5 Changes
+		repository = GetRepository(dir.Path())
 
-			repository = GetRepository(dir.Path())
+		repository.RemoveFile(dir.Join("1.txt"))
+		repository.RemoveFile(dir.Join("2.txt"))
+		repository.RemoveFile(dir.Join("a", "4.txt"))
+		repository.SaveIndex()
+		save5 = repository.CreateSave("SAVE 5")
+	}
 
-			repository.RemoveFile(dir.Join("1.txt"))
-			repository.RemoveFile(dir.Join("2.txt"))
-			repository.RemoveFile(dir.Join("a", "4.txt"))
-			repository.SaveIndex()
-			save5 = repository.CreateSave("SAVE 5")
-		}
+	// Test Save 3
+	{
+		repository = GetRepository(dir.Path())
+		repository.Load(save3.Id, ".")
 
-		// Test Save 3
-		{
-			repository = GetRepository(dir.Path())
-			repository.Load(save3.Id, ".")
-
-			assert.Equal(t, repository.head, save3.Id)
-			assert.Assert(
-				t,
-				fs.Equal(
-					dir.Path(),
-					fs.Expected(
-						t,
-						fs.WithDir(filesystem.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
-						fs.WithFile("1.txt", "file 1 (SAVE 0)."),
-						fs.WithFile("2.txt", "file 2 (SAVE 0) (SAVE 1) (SAVE 3)."),
+		assert.Equal(t, repository.head, save3.Id)
+		assert.Assert(
+			t,
+			fs.Equal(
+				dir.Path(),
+				fs.Expected(
+					t,
+					fs.WithDir(filesystem.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+					fs.WithFile("1.txt", "file 1 (SAVE 0)."),
+					fs.WithFile("2.txt", "file 2 (SAVE 0) (SAVE 1) (SAVE 3)."),
+					fs.WithDir(
+						"a",
+						fs.WithFile("4.txt", "file 4 (SAVE 0) (SAVE 2)."),
+						fs.WithDir("b",
+							fs.WithFile("6.txt", "file 6 (SAVE 0)."),
+						)),
+					fs.WithDir(
+						"c",
+						fs.WithFile("8.txt", "file 8 (SAVE 0)."),
+					),
+					fs.WithDir(
+						"dir1",
+						fs.WithFile("10.txt", "file 10 (SAVE 3)."),
 						fs.WithDir(
-							"a",
-							fs.WithFile("4.txt", "file 4 (SAVE 0) (SAVE 2)."),
-							fs.WithDir("b",
-								fs.WithFile("6.txt", "file 6 (SAVE 0)."),
-							)),
-						fs.WithDir(
-							"c",
-							fs.WithFile("8.txt", "file 8 (SAVE 0)."),
-						),
-						fs.WithDir(
-							"dir1",
-							fs.WithFile("10.txt", "file 10 (SAVE 3)."),
+							"dir2",
+							fs.WithFile("11.txt", "file 11 (SAVE 3)."),
 							fs.WithDir(
-								"dir2",
-								fs.WithFile("11.txt", "file 11 (SAVE 3)."),
+								"dir3",
+								fs.WithFile("12.txt", "file 12 (SAVE 3)."),
 								fs.WithDir(
-									"dir3",
-									fs.WithFile("12.txt", "file 12 (SAVE 3)."),
-									fs.WithDir(
-										"dir4",
-										fs.WithFile("13.txt", "file 13 (SAVE 3)."),
-									),
+									"dir4",
+									fs.WithFile("13.txt", "file 13 (SAVE 3)."),
 								),
 							),
 						),
 					),
 				),
-			)
-		}
-
-		// Test Save 0
-		{
-			repository = GetRepository(dir.Path())
-			repository.Load(save0.Id, ".")
-
-			assert.Equal(t, repository.head, save0.Id)
-			assert.Assert(
-				t,
-				fs.Equal(
-					dir.Path(),
-					fs.Expected(
-						t,
-						fs.WithDir(filesystem.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
-						fs.WithFile("1.txt", "file 1 (SAVE 0)."),
-						fs.WithFile("2.txt", "file 2 (SAVE 0)."),
-						fs.WithDir(
-							"a",
-							fs.WithFile("4.txt", "file 4 (SAVE 0)."),
-							fs.WithDir("b",
-								fs.WithFile("6.txt", "file 6 (SAVE 0)."),
-							)),
-						fs.WithDir(
-							"c",
-							fs.WithFile("8.txt", "file 8 (SAVE 0)."),
-						),
-					),
-				),
-			)
-		}
-
-		// Test Save 5
-		{
-			repository = GetRepository(dir.Path())
-			repository.Load(save5.Id, ".")
-
-			assert.Equal(t, repository.head, save5.Id)
-			assert.Assert(
-				t,
-				fs.Equal(
-					dir.Path(),
-					fs.Expected(
-						t,
-						fs.WithDir(filesystem.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
-						fs.WithDir(
-							"a",
-							fs.WithDir("b",
-								fs.WithFile("6.txt", "file 6 (SAVE 0) (SAVE 4)."),
-							)),
-						fs.WithDir(
-							"c",
-							fs.WithFile("8.txt", "file 8 (SAVE 0) (SAVE 4)."),
-						),
-					),
-				),
-			)
-		}
+			),
+		)
 	}
+
+	// Test Save 0
+	{
+		repository = GetRepository(dir.Path())
+		repository.Load(save0.Id, ".")
+
+		assert.Equal(t, repository.head, save0.Id)
+		assert.Assert(
+			t,
+			fs.Equal(
+				dir.Path(),
+				fs.Expected(
+					t,
+					fs.WithDir(filesystem.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+					fs.WithFile("1.txt", "file 1 (SAVE 0)."),
+					fs.WithFile("2.txt", "file 2 (SAVE 0)."),
+					fs.WithDir(
+						"a",
+						fs.WithFile("4.txt", "file 4 (SAVE 0)."),
+						fs.WithDir("b",
+							fs.WithFile("6.txt", "file 6 (SAVE 0)."),
+						)),
+					fs.WithDir(
+						"c",
+						fs.WithFile("8.txt", "file 8 (SAVE 0)."),
+					),
+				),
+			),
+		)
+	}
+
+	// Test Save 5
+	{
+		repository = GetRepository(dir.Path())
+		repository.Load(save5.Id, ".")
+
+		assert.Equal(t, repository.head, save5.Id)
+		assert.Assert(
+			t,
+			fs.Equal(
+				dir.Path(),
+				fs.Expected(
+					t,
+					fs.WithDir(filesystem.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+					fs.WithDir(
+						"a",
+						fs.WithDir("b",
+							fs.WithFile("6.txt", "file 6 (SAVE 0) (SAVE 4)."),
+						)),
+					fs.WithDir(
+						"c",
+						fs.WithFile("8.txt", "file 8 (SAVE 0) (SAVE 4)."),
+					),
+				),
+			),
+		)
+	}
+}
+
+func TestGetLogs(t *testing.T) {
+	dir, repository := fixtureGetBaseProject(t)
+	defer dir.Remove()
+
+	// History empty
+
+	testifyAssert.EqualValues(t, repository.GetLogs(), []*Log{})
+
+	// After Save 0
+
+	fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 original content."))
+
+	repository.IndexFile(dir.Join("1.txt"))
+	repository.SaveIndex()
+	save0 := repository.CreateSave("save0")
+
+	logs := repository.GetLogs()
+	testifyAssert.Equal(t, len(logs), 1)
+	testifyAssert.Equal(t, logs[0].Checkpoint.Id, save0.Id)
+	testifyAssert.Equal(t, logs[0].Checkpoint.Message, save0.Message)
+	testifyAssert.Equal(t, logs[0].Checkpoint.Parent, save0.Parent)
+	// When saving the time in the file, using the Layout format, we lose the ms precision.
+	// Therefore this is needed to compare times
+	testifyAssert.Equal(t, logs[0].Checkpoint.CreatedAt.Format(time.Layout), save0.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, logs[0].Checkpoint.Changes, save0.Changes)
+
+	// After Save 1
+
+	repository = GetRepository(dir.Path())
+
+	fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 original content."))
+
+	repository.IndexFile(dir.Join("2.txt"))
+	repository.SaveIndex()
+	save1 := repository.CreateSave("save1")
+
+	logs = repository.GetLogs()
+	testifyAssert.Equal(t, len(logs), 2)
+	testifyAssert.Equal(t, logs[0].Checkpoint.Id, save1.Id)
+	testifyAssert.Equal(t, logs[0].Checkpoint.Message, save1.Message)
+	testifyAssert.Equal(t, logs[0].Checkpoint.Parent, save1.Parent)
+	// When saving the time in the file, using the Layout format, we lose the ms precision.
+	// Therefore this is needed to compare times
+	testifyAssert.Equal(t, logs[0].Checkpoint.CreatedAt.Format(time.Layout), save1.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, logs[0].Checkpoint.Changes, save1.Changes)
+
+	testifyAssert.Equal(t, logs[1].Checkpoint.Id, save0.Id)
+	testifyAssert.Equal(t, logs[1].Checkpoint.Message, save0.Message)
+	testifyAssert.Equal(t, logs[1].Checkpoint.Parent, save0.Parent)
+	// When saving the time in the file, using the Layout format, we lose the ms precision.
+	// Therefore this is needed to compare times
+	testifyAssert.Equal(t, logs[1].Checkpoint.CreatedAt.Format(time.Layout), save0.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, logs[1].Checkpoint.Changes, save0.Changes)
+
+	// After Save 2
+
+	repository = GetRepository(dir.Path())
+
+	fixtures.WriteFile(dir.Join("3.txt"), []byte("file 3 original content."))
+
+	repository.IndexFile(dir.Join("3.txt"))
+	repository.SaveIndex()
+	save2 := repository.CreateSave("save2")
+
+	logs = repository.GetLogs()
+	testifyAssert.Equal(t, len(logs), 3)
+	testifyAssert.Equal(t, logs[0].Checkpoint.Id, save2.Id)
+	testifyAssert.Equal(t, logs[0].Checkpoint.Message, save2.Message)
+	testifyAssert.Equal(t, logs[0].Checkpoint.Parent, save2.Parent)
+	// When saving the time in the file, using the Layout format, we lose the ms precision.
+	// Therefore this is needed to compare times
+	testifyAssert.Equal(t, logs[0].Checkpoint.CreatedAt.Format(time.Layout), save2.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, logs[0].Checkpoint.Changes, save2.Changes)
+
+	testifyAssert.Equal(t, logs[1].Checkpoint.Id, save1.Id)
+	testifyAssert.Equal(t, logs[1].Checkpoint.Message, save1.Message)
+	testifyAssert.Equal(t, logs[1].Checkpoint.Parent, save1.Parent)
+	// When saving the time in the file, using the Layout format, we lose the ms precision.
+	// Therefore this is needed to compare times
+	testifyAssert.Equal(t, logs[1].Checkpoint.CreatedAt.Format(time.Layout), save1.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, logs[1].Checkpoint.Changes, save1.Changes)
+
+	testifyAssert.Equal(t, logs[2].Checkpoint.Id, save0.Id)
+	testifyAssert.Equal(t, logs[2].Checkpoint.Message, save0.Message)
+	testifyAssert.Equal(t, logs[2].Checkpoint.Parent, save0.Parent)
+	// When saving the time in the file, using the Layout format, we lose the ms precision.
+	// Therefore this is needed to compare times
+	testifyAssert.Equal(t, logs[2].Checkpoint.CreatedAt.Format(time.Layout), save0.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, logs[2].Checkpoint.Changes, save0.Changes)
 }
