@@ -29,6 +29,10 @@ type Repository struct {
 	dir   directory.Dir
 }
 
+type Log struct {
+	Checkpoint *filesystem.Checkpoint
+}
+
 type Status struct {
 	Staged struct {
 		CreatedFilesPaths []string
@@ -170,12 +174,12 @@ func (repository *Repository) SetHead(checkpointId string) {
 	repository.fs.WriteHead(repository.head)
 }
 
-func (repository *Repository) CreateSave(message string) *filesystem.CheckPoint {
+func (repository *Repository) CreateSave(message string) *filesystem.Checkpoint {
 	if len(repository.index) == 0 {
 		errors.Error("Cannot save empty index.")
 	}
 
-	save := filesystem.CheckPoint{
+	save := filesystem.Checkpoint{
 		Message:   message,
 		Parent:    repository.head,
 		Changes:   repository.index,
@@ -385,7 +389,7 @@ func (repository *Repository) resolvePath(path string) (string, *ValidationError
 //     It can be used to restore the current head + index changes. Index changes
 //     have higher priorities.
 //
-//  2. Load all the content saved up until all checkpoints created.
+//  2. Load all the content saved up until a checkpoint is created.
 func (repository *Repository) Load(ref string, path string) *ValidationError {
 	resolvedPath, err := repository.resolvePath(path)
 	if err != nil {
@@ -490,4 +494,20 @@ func (repository *Repository) Load(ref string, path string) *ValidationError {
 	}
 
 	return nil
+}
+
+func (repository *Repository) GetLogs() []*Log {
+	save := repository.getSave(repository.head)
+
+	if save == nil {
+		return []*Log{}
+	}
+
+	// By default the save checkpoints is ordered by createdAt in ascending order.
+	// The other way around is better for logging.
+	slices.Reverse(save.Checkpoints)
+
+	return collections.Map(save.Checkpoints, func(checkpoint *filesystem.Checkpoint, _ int) *Log {
+		return &Log{Checkpoint: checkpoint}
+	})
 }

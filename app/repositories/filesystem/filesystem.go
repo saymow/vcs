@@ -28,10 +28,10 @@ const (
 
 type Save struct {
 	Id          string
-	Checkpoints []*CheckPoint
+	Checkpoints []*Checkpoint
 }
 
-type CheckPoint struct {
+type Checkpoint struct {
 	Id        string
 	Message   string
 	CreatedAt time.Time
@@ -288,7 +288,7 @@ func (fileSystem *FileSystem) RemoveObject(name string) {
 	errors.Check(err)
 }
 
-func (fileSystem *FileSystem) WriteSave(save *CheckPoint) string {
+func (fileSystem *FileSystem) WriteSave(save *Checkpoint) string {
 	var stringBuilder strings.Builder
 
 	_, err := stringBuilder.Write([]byte(fmt.Sprintf("%s\n", save.Message)))
@@ -333,9 +333,11 @@ func (fileSystem *FileSystem) WriteSave(save *CheckPoint) string {
 	return saveName
 }
 
-func (fileSystem *FileSystem) ParseCheckpoint(file *os.File) *CheckPoint {
-	checkpoint := &CheckPoint{}
+func (fileSystem *FileSystem) ParseCheckpoint(id string, file *os.File) *Checkpoint {
+	checkpoint := &Checkpoint{}
 	scanner := bufio.NewScanner(file)
+
+	checkpoint.Id = id
 
 	scanner.Scan()
 	checkpoint.Message = scanner.Text()
@@ -406,13 +408,13 @@ func (fileSystem *FileSystem) ReadSave(checkpointId string) *Save {
 	}
 	defer checkpointFile.Close()
 
-	save.Checkpoints = append(save.Checkpoints, fileSystem.ParseCheckpoint(checkpointFile))
+	save.Checkpoints = append(save.Checkpoints, fileSystem.ParseCheckpoint(checkpointId, checkpointFile))
 
 	for save.Checkpoints[len(save.Checkpoints)-1].Parent != "" {
 		checkpointId = save.Checkpoints[len(save.Checkpoints)-1].Parent
 		checkpointFile, err = os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
 		errors.Check(err)
-		save.Checkpoints = append(save.Checkpoints, fileSystem.ParseCheckpoint(checkpointFile))
+		save.Checkpoints = append(save.Checkpoints, fileSystem.ParseCheckpoint(checkpointId, checkpointFile))
 		checkpointFile.Close()
 	}
 
