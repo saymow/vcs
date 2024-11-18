@@ -24,6 +24,9 @@ const (
 	SAVES_FOLDER_NAME      = "saves"
 	INDEX_FILE_NAME        = "index"
 	HEAD_FILE_NAME         = "head"
+	REFS_FILE_NAME         = "refs"
+
+	INITAL_BRANCH_NAME = "master"
 )
 
 type Save struct {
@@ -43,6 +46,8 @@ type FileSystem struct {
 	Root string
 }
 
+type Refs map[string]string
+
 func Create(root string) *FileSystem {
 	err := os.Mkdir(path.Join(root, REPOSITORY_FOLDER_NAME), 0644)
 	errors.Check(err)
@@ -54,9 +59,19 @@ func Create(root string) *FileSystem {
 	_, err = indexFile.Write([]byte("Tracked files:\r\n\r\n"))
 	errors.Check(err)
 
+	refsFile, err := os.Create(path.Join(root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME))
+	errors.Check(err)
+	defer refsFile.Close()
+
+	_, err = refsFile.Write([]byte(fmt.Sprintf("Refs:\n\n%s\n\n", INITAL_BRANCH_NAME)))
+	errors.Check(err)
+
 	headFile, err := os.Create(path.Join(root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME))
 	errors.Check(err)
 	defer headFile.Close()
+
+	_, err = headFile.Write([]byte(INITAL_BRANCH_NAME))
+	errors.Check(err)
 
 	err = os.Mkdir(path.Join(root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME), 0644)
 	errors.Check(err)
@@ -138,6 +153,46 @@ func (fileSystem *FileSystem) ReadIndex() []*directory.Change {
 	return fileSystem.parseIndex(file)
 }
 
+func (fileSystem *FileSystem) ReadRefs() *Refs {
+	refs := Refs{}
+
+	file, err := os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME))
+	errors.Check(err)
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	// Skip file header lines
+	scanner.Scan()
+	scanner.Scan()
+
+	for scanner.Scan() {
+		key := scanner.Text()
+
+		if !scanner.Scan() {
+			errors.Error("Invalid refs format.")
+		}
+
+		refs[key] = scanner.Text()
+	}
+
+	return &refs
+}
+
+func (fileSystem *FileSystem) WriteRefs(refs *Refs) {
+	file, err := os.OpenFile(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0644)
+	errors.Check(err)
+	defer file.Close()
+
+	_, err = file.Write([]byte("Refs:\n\n"))
+	errors.Check(err)
+
+	for branchName, saveName := range *refs {
+		_, err = file.Write([]byte(fmt.Sprintf("%s\n%s\n", branchName, saveName)))
+		errors.Check(err)
+	}
+}
+
 func (fileSystem *FileSystem) WriteHead(name string) {
 	file, err := os.OpenFile(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0644)
 	errors.Check(err)
@@ -165,10 +220,9 @@ func (fileSystem *FileSystem) ReadHead() string {
 	return fileSystem.parseHead(file)
 }
 
-func (fileSystem *FileSystem) ReadDir(head string) directory.Dir {
+func (fileSystem *FileSystem) ReadDir(saveName string) directory.Dir {
 	dir := directory.Dir{Path: fileSystem.Root, Children: make(map[string]*directory.Node)}
 	changes := []directory.Change{}
-	saveName := head
 
 	for saveName != "" {
 		file, err := os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))

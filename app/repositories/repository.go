@@ -24,6 +24,7 @@ import (
 
 type Repository struct {
 	fs    *filesystem.FileSystem
+	refs  *filesystem.Refs
 	head  string
 	index []*directory.Change
 	dir   directory.Dir
@@ -55,30 +56,53 @@ func CreateRepository(root string) *Repository {
 
 	return &Repository{
 		fs:    fileSystem,
+		refs:  &filesystem.Refs{filesystem.INITAL_BRANCH_NAME: ""},
+		head:  filesystem.INITAL_BRANCH_NAME,
 		index: []*directory.Change{},
 		dir:   directory.Dir{},
 	}
 }
 
 func GetRepository(root string) *Repository {
-	fileSystem := filesystem.Open(root)
-	index := fileSystem.ReadIndex()
-	head := fileSystem.ReadHead()
-	dir := fileSystem.ReadDir(head)
+	repository := &Repository{}
 
-	return &Repository{
-		fs:    fileSystem,
-		index: index,
-		head:  head,
-		dir:   dir,
-	}
+	repository.fs = filesystem.Open(root)
+	repository.index = repository.fs.ReadIndex()
+	repository.refs = repository.fs.ReadRefs()
+	repository.head = repository.fs.ReadHead()
+	repository.dir = repository.fs.ReadDir(repository.getCurrentSaveName())
+
+	return repository
 }
 
 func (err *ValidationError) Error() string {
 	return fmt.Sprintf("Validation Error: %s", err.message)
 }
 
-func (repository *Repository) IndexFile(filepath string) {
+func (repository *Repository) getCurrentSaveName() string {
+	if repository.isDetachedMode() {
+		return repository.head
+	}
+
+	return (*repository.refs)[repository.head]
+}
+
+func (repository *Repository) isDetachedMode() bool {
+	if _, ok := (*repository.refs)[repository.head]; ok {
+		// Then head is a reference
+
+		return false
+	}
+	// Otherwise, head is a saveName
+
+	return true
+}
+
+func (repository *Repository) IndexFile(filepath string) error {
+	if repository.isDetachedMode() {
+		return &ValidationError{"cannot make changes in detached mode."}
+	}
+
 	if !Path.IsAbs(filepath) {
 		filepath = Path.Join(repository.fs.Root, filepath)
 	}
@@ -129,9 +153,15 @@ func (repository *Repository) IndexFile(filepath string) {
 		// Index change
 		repository.index = append(repository.index, &directory.Change{ChangeType: ChangeType, File: object})
 	}
+
+	return nil
 }
 
-func (repository *Repository) RemoveFile(filepath string) {
+func (repository *Repository) RemoveFile(filepath string) error {
+	if repository.isDetachedMode() {
+		return &ValidationError{"cannot make changes in detached mode."}
+	}
+
 	if !Path.IsAbs(filepath) {
 		filepath = Path.Join(repository.fs.Root, filepath)
 	}
@@ -151,7 +181,7 @@ func (repository *Repository) RemoveFile(filepath string) {
 	if stagedChangeIdx != -1 {
 		if repository.index[stagedChangeIdx].ChangeType == directory.Removal {
 			// Index entry is already meant for removal
-			return
+			return nil
 		}
 
 		// Remove existing change from the index
@@ -163,39 +193,55 @@ func (repository *Repository) RemoveFile(filepath string) {
 		// Create Index file removal entry
 		repository.index = append(repository.index, &directory.Change{ChangeType: directory.Removal, Removal: &directory.FileRemoval{Filepath: filepath}})
 	}
+
+	return nil
 }
 
-func (repository *Repository) SaveIndex() {
+func (repository *Repository) SaveIndex() error {
+	if repository.isDetachedMode() {
+		return &ValidationError{"cannot make changes in detached mode."}
+	}
+
+	repository.fs.SaveIndex(repository.index)
+
+	return nil
+}
+
+func (repository *Repository) clearIndex() {
+	repository.index = []*directory.Change{}
 	repository.fs.SaveIndex(repository.index)
 }
 
-func (repository *Repository) SetHead(checkpointId string) {
-	repository.head = checkpointId
+func (repository *Repository) setRef(name, saveName string) {
+	(*repository.refs)[name] = saveName
+	repository.fs.WriteRefs(repository.refs)
+}
+
+func (repository *Repository) SetHead(newHead string) {
+	repository.head = newHead
 	repository.fs.WriteHead(repository.head)
 }
 
-func (repository *Repository) CreateSave(message string) *filesystem.Checkpoint {
+func (repository *Repository) CreateSave(message string) (*filesystem.Checkpoint, error) {
+	if repository.isDetachedMode() {
+		return nil, &ValidationError{"cannot make changes in detached mode."}
+	}
 	if len(repository.index) == 0 {
-		errors.Error("Cannot save empty index.")
+		return nil, &ValidationError{"Cannot save empty index."}
 	}
 
 	save := filesystem.Checkpoint{
 		Message:   message,
-		Parent:    repository.head,
+		Parent:    repository.getCurrentSaveName(),
 		Changes:   repository.index,
 		CreatedAt: time.Now(),
 	}
 
 	save.Id = repository.fs.WriteSave(&save)
 	repository.clearIndex()
-	repository.SetHead(save.Id)
+	repository.setRef(repository.head, save.Id)
 
-	return &save
-}
-
-func (repository *Repository) clearIndex() {
-	repository.index = []*directory.Change{}
-	repository.fs.SaveIndex(repository.index)
+	return &save, nil
 }
 
 func (repository *Repository) findStagedChangeIdx(filepath string) int {
@@ -328,16 +374,27 @@ func (repository *Repository) GetStatus() *Status {
 }
 
 func (repository *Repository) getSave(ref string) *filesystem.Save {
-	var checkpointId string
-
-	if ref == "HEAD" {
-		checkpointId = repository.head
-	} else {
-		checkpointId = ref
-	}
-
 	if ref == "" {
 		return nil
+	}
+	if ref == filesystem.INITAL_BRANCH_NAME {
+		if saveName, ok := (*repository.refs)[ref]; ok && saveName == "" {
+			// This is expect to only happen for repositories with not saves
+
+			return nil
+		}
+	}
+
+	if ref == "HEAD" {
+		ref = repository.head
+	}
+
+	var checkpointId string
+
+	if saveName, ok := (*repository.refs)[ref]; ok {
+		checkpointId = saveName
+	} else {
+		checkpointId = ref
 	}
 
 	return repository.fs.ReadSave(checkpointId)
@@ -401,7 +458,7 @@ func (repository *Repository) Load(ref string, path string) *ValidationError {
 		return &ValidationError{fmt.Sprintf("\"%s\" is an invalid ref.", ref)}
 	}
 
-	if save.Id != repository.head {
+	if save.Id != repository.getCurrentSaveName() {
 		workingDirStatus := repository.GetStatus().WorkingDir
 
 		if len(workingDirStatus.ModifiedFilePaths) > 0 || len(workingDirStatus.UntrackedFilePaths) > 0 {
@@ -416,7 +473,7 @@ func (repository *Repository) Load(ref string, path string) *ValidationError {
 
 	filesRemovedFromIndex := []*directory.File{}
 
-	if save.Id == repository.head {
+	if save.Id == repository.getCurrentSaveName() {
 		// Index files have higher priority over tree files to be restored
 
 		if node.NodeType == directory.FileType {
@@ -489,8 +546,8 @@ func (repository *Repository) Load(ref string, path string) *ValidationError {
 		repository.fs.RemoveObject(fileRemoved.ObjectName)
 	}
 
-	if save.Id != repository.head {
-		repository.SetHead(save.Id)
+	if ref != "HEAD" {
+		repository.SetHead(ref)
 	}
 
 	return nil
