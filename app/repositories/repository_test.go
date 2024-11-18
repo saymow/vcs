@@ -877,6 +877,53 @@ func TestLoadHeadDir(t *testing.T) {
 	}
 }
 
+func TestLoadHistoryUnsavedChanges(t *testing.T) {
+	dir, repository := fixtureGetBaseProject(t)
+	defer dir.Remove()
+	var save *filesystem.CheckPoint
+
+	// Setup
+	{
+		// SAVE 0
+		{
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
+
+			repository.IndexFile(dir.Join("1.txt"))
+			repository.IndexFile(dir.Join("2.txt"))
+			repository.IndexFile(dir.Join("a", "4.txt"))
+			repository.IndexFile(dir.Join("a", "b", "6.txt"))
+			repository.IndexFile(dir.Join("c", "8.txt"))
+			repository.SaveIndex()
+			save = repository.CreateSave("SAVE 0")
+		}
+
+		// SAVE 1
+		{
+			repository = GetRepository(dir.Path())
+
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0) (SAVE 1)."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1)."))
+			repository.IndexFile(dir.Join("1.txt"))
+			repository.IndexFile(dir.Join("2.txt"))
+			repository.SaveIndex()
+			repository.CreateSave("SAVE 1")
+		}
+
+		fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
+		fixtures.WriteFile(dir.Join("newfile.txt"), []byte("new file content."))
+	}
+
+	// Test Save
+	{
+		repository = GetRepository(dir.Path())
+		testifyAssert.EqualError(t, repository.Load(save.Id, ""), "Validation Error: you have unsaved changes in the working dir, you have to save them before loading a save.")
+	}
+}
+
 func TestLoadHistory(t *testing.T) {
 	dir, repository := fixtureGetBaseProject(t)
 	defer dir.Remove()
@@ -896,6 +943,11 @@ func TestLoadHistory(t *testing.T) {
 			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
 			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
 			fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
+
+			fixtures.RemoveFile(dir.Join("3.txt"))
+			fixtures.RemoveFile(dir.Join("a", "5.txt"))
+			fixtures.RemoveFile(dir.Join("a", "b", "7.txt"))
+			fixtures.RemoveFile(dir.Join("c", "9.txt"))
 
 			repository.IndexFile(dir.Join("1.txt"))
 			repository.IndexFile(dir.Join("2.txt"))
@@ -975,11 +1027,6 @@ func TestLoadHistory(t *testing.T) {
 			repository.RemoveFile(dir.Join("a", "4.txt"))
 			repository.SaveIndex()
 			save5 = repository.CreateSave("SAVE 5")
-
-			// Working dir changes
-
-			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
-			fixtures.WriteFile(dir.Join("newfile.txt"), []byte("new file content."))
 		}
 
 		// Test Save 3
@@ -987,6 +1034,7 @@ func TestLoadHistory(t *testing.T) {
 			repository = GetRepository(dir.Path())
 			repository.Load(save3.Id, "")
 
+			assert.Equal(t, repository.head, save3.Id)
 			assert.Assert(
 				t,
 				fs.Equal(
@@ -1032,6 +1080,7 @@ func TestLoadHistory(t *testing.T) {
 			repository = GetRepository(dir.Path())
 			repository.Load(save0.Id, "")
 
+			assert.Equal(t, repository.head, save0.Id)
 			assert.Assert(
 				t,
 				fs.Equal(
@@ -1061,6 +1110,7 @@ func TestLoadHistory(t *testing.T) {
 			repository = GetRepository(dir.Path())
 			repository.Load(save5.Id, "")
 
+			assert.Equal(t, repository.head, save5.Id)
 			assert.Assert(
 				t,
 				fs.Equal(
