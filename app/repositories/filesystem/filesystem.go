@@ -27,6 +27,7 @@ const (
 )
 
 type Save struct {
+	Id          string
 	Checkpoints []*CheckPoint
 }
 
@@ -393,7 +394,7 @@ func (fileSystem *FileSystem) ParseCheckpoint(file *os.File) *CheckPoint {
 }
 
 func (fileSystem *FileSystem) ReadSave(checkpointId string) *Save {
-	save := &Save{}
+	save := &Save{Id: checkpointId}
 
 	checkpointFile, err := os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
 	if err != nil {
@@ -420,7 +421,7 @@ func (fileSystem *FileSystem) ReadSave(checkpointId string) *Save {
 	return save
 }
 
-func (fileSystem *FileSystem) applyFile(file *directory.File) {
+func (fileSystem *FileSystem) createFile(file *directory.File) {
 	sourceFile, err := os.OpenFile(file.Filepath, os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -458,9 +459,9 @@ func (fileSystem *FileSystem) applyFile(file *directory.File) {
 	}
 }
 
-func (fileSystem *FileSystem) ApplyNode(node *directory.Node) {
+func (fileSystem *FileSystem) CreateNode(node *directory.Node) {
 	if node.NodeType == directory.FileType {
-		fileSystem.applyFile(node.File)
+		fileSystem.createFile(node.File)
 		return
 	}
 

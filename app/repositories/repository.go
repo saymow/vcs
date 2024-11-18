@@ -165,6 +165,11 @@ func (repository *Repository) SaveIndex() {
 	repository.fs.SaveIndex(repository.index)
 }
 
+func (repository *Repository) SetHead(checkpointId string) {
+	repository.head = checkpointId
+	repository.fs.WriteHead(repository.head)
+}
+
 func (repository *Repository) CreateSave(message string) *filesystem.CheckPoint {
 	if len(repository.index) == 0 {
 		errors.Error("Cannot save empty index.")
@@ -179,7 +184,7 @@ func (repository *Repository) CreateSave(message string) *filesystem.CheckPoint 
 
 	save.Id = repository.fs.WriteSave(&save)
 	repository.clearIndex()
-	repository.fs.WriteHead(save.Id)
+	repository.SetHead(save.Id)
 
 	return &save
 }
@@ -258,6 +263,7 @@ func (repository *Repository) GetStatus() *Status {
 
 		file, err := os.Open(filepath)
 		errors.Check(err)
+		defer file.Close()
 
 		var buffer bytes.Buffer
 		chunkBuffer := make([]byte, 1024)
@@ -366,17 +372,22 @@ func (repository *Repository) Load(ref string, path string) error {
 	if save == nil {
 		return &ValidationError{fmt.Sprintf("\"%s\" is an invalid ref.", ref)}
 	}
+	if save.Id != repository.head {
+		workingDirStatus := repository.GetStatus().WorkingDir
 
-	rootDir := buildDirFromSave(repository.fs.Root, save)
+		if len(workingDirStatus.ModifiedFilePaths) > 0 || len(workingDirStatus.UntrackedFilePaths) > 0 {
+			return &ValidationError{"you have unsaved changes in the working dir, you have to save them before loading a save."}
+		}
+	}
 
-	node := rootDir.FindNode(path)
+	node := buildDirFromSave(repository.fs.Root, save).FindNode(path)
 	if node == nil {
 		return &ValidationError{fmt.Sprintf("\"%s\" is a invalid path.", ref)}
 	}
 
 	filesRemovedFromIndex := []*directory.File{}
 
-	if ref == "HEAD" {
+	if save.Id == repository.head {
 		// Index files have higher priority over tree files to be restored
 
 		if node.NodeType == directory.FileType {
@@ -430,8 +441,8 @@ func (repository *Repository) Load(ref string, path string) error {
 	if node.NodeType == directory.DirType {
 		nodes := node.Dir.PreOrderTraversal()
 
-		if node.Dir == rootDir {
-			// if we are traversing the root dir, the root-dir-file is included in the response.
+		if node.Dir.Path == repository.fs.Root {
+			// if we are traversing the root dir, the root-dir-file should be removed from the response.
 
 			nodes = nodes[1:]
 		}
@@ -439,14 +450,18 @@ func (repository *Repository) Load(ref string, path string) error {
 		repository.fs.SafeRemoveDir(node.Dir)
 
 		for _, node := range nodes {
-			repository.fs.ApplyNode(node)
+			repository.fs.CreateNode(node)
 		}
 	} else {
-		repository.fs.ApplyNode(node)
+		repository.fs.CreateNode(node)
 	}
 
 	for _, fileRemoved := range filesRemovedFromIndex {
 		repository.fs.RemoveObject(fileRemoved.ObjectName)
+	}
+
+	if save.Id != repository.head {
+		repository.SetHead(save.Id)
 	}
 
 	return nil
