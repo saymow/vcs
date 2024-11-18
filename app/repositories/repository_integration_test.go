@@ -839,7 +839,7 @@ func TestLoadHeadDir(t *testing.T) {
 			repository.SaveIndex()
 
 			repository = GetRepository(dir.Path())
-			repository.Load("HEAD", "")
+			repository.Load("HEAD", ".")
 		}
 
 		// Test
@@ -920,7 +920,7 @@ func TestLoadHistoryUnsavedChanges(t *testing.T) {
 	// Test Save
 	{
 		repository = GetRepository(dir.Path())
-		testifyAssert.EqualError(t, repository.Load(save.Id, ""), "Validation Error: you have unsaved changes in the working dir, you have to save them before loading a save.")
+		testifyAssert.EqualError(t, repository.Load(save.Id, "."), "Validation Error: you have unsaved changes in the working dir, you have to save them before loading a save.")
 	}
 }
 
@@ -1032,7 +1032,7 @@ func TestLoadHistory(t *testing.T) {
 		// Test Save 3
 		{
 			repository = GetRepository(dir.Path())
-			repository.Load(save3.Id, "")
+			repository.Load(save3.Id, ".")
 
 			assert.Equal(t, repository.head, save3.Id)
 			assert.Assert(
@@ -1078,7 +1078,7 @@ func TestLoadHistory(t *testing.T) {
 		// Test Save 0
 		{
 			repository = GetRepository(dir.Path())
-			repository.Load(save0.Id, "")
+			repository.Load(save0.Id, ".")
 
 			assert.Equal(t, repository.head, save0.Id)
 			assert.Assert(
@@ -1108,7 +1108,7 @@ func TestLoadHistory(t *testing.T) {
 		// Test Save 5
 		{
 			repository = GetRepository(dir.Path())
-			repository.Load(save5.Id, "")
+			repository.Load(save5.Id, ".")
 
 			assert.Equal(t, repository.head, save5.Id)
 			assert.Assert(
