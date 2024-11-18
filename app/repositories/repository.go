@@ -359,6 +359,25 @@ func buildDirFromSave(root string, save *filesystem.Save) *directory.Dir {
 	return dir
 }
 
+func (repository *Repository) resolvePath(path string) (string, *ValidationError) {
+	if !Path.IsAbs(path) {
+		path = Path.Join(repository.fs.Root, path)
+	}
+	if !strings.HasPrefix(path, repository.fs.Root) {
+		return "", &ValidationError{fmt.Sprintf("\"%s\" is an invalid path.", path)}
+	}
+
+	var normalizedPath string
+
+	if path == repository.fs.Root {
+		normalizedPath = path[len(repository.fs.Root):]
+	} else {
+		normalizedPath = path[len(repository.fs.Root)+1:]
+	}
+
+	return normalizedPath, nil
+}
+
 // Load cover 2 usecases:
 //
 //  1. Restore HEAD + index changes (...and remove the index change).
@@ -367,11 +386,17 @@ func buildDirFromSave(root string, save *filesystem.Save) *directory.Dir {
 //     have higher priorities.
 //
 //  2. Load all the content saved up until all checkpoints created.
-func (repository *Repository) Load(ref string, path string) error {
+func (repository *Repository) Load(ref string, path string) *ValidationError {
+	resolvedPath, err := repository.resolvePath(path)
+	if err != nil {
+		return err
+	}
+
 	save := repository.getSave(ref)
 	if save == nil {
 		return &ValidationError{fmt.Sprintf("\"%s\" is an invalid ref.", ref)}
 	}
+
 	if save.Id != repository.head {
 		workingDirStatus := repository.GetStatus().WorkingDir
 
@@ -380,9 +405,9 @@ func (repository *Repository) Load(ref string, path string) error {
 		}
 	}
 
-	node := buildDirFromSave(repository.fs.Root, save).FindNode(path)
+	node := buildDirFromSave(repository.fs.Root, save).FindNode(resolvedPath)
 	if node == nil {
-		return &ValidationError{fmt.Sprintf("\"%s\" is a invalid path.", ref)}
+		return &ValidationError{fmt.Sprintf("\"%s\" is a invalid path.", path)}
 	}
 
 	filesRemovedFromIndex := []*directory.File{}
