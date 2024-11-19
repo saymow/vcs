@@ -475,92 +475,61 @@ func (repository *Repository) Restore(ref string, path string) *ValidationError 
 
 	filesRemovedFromIndex := []*directory.File{}
 
-	if ref == "HEAD" {
-		// Index files have higher priority over tree files to be restored
+	if node.NodeType == directory.FileType {
+		// Check if there is a index modification for the node
+		stagedChangeIdx := repository.findStagedChangeIdx(node.File.Filepath)
 
-		if node.NodeType == directory.FileType {
-			// Check if there is a index modification for the node
+		if stagedChangeIdx != -1 {
+			// If so, remove the change from the index
 
-			stagedChangeIdx := repository.findStagedChangeIdx(node.File.Filepath)
+			if repository.index[stagedChangeIdx].ChangeType != directory.Removal {
+				// If it is a file modification, should also remove its object
 
-			if stagedChangeIdx != -1 {
-				// If so, remove the change from the index
-
-				if repository.index[stagedChangeIdx].ChangeType != directory.Removal {
-					// If it is a file modification, the index modification is applied instead of the tree one.
+				if ref == "HEAD" {
+					// If restoring to HEAD, index is a priority
 
 					node = &directory.Node{NodeType: directory.FileType, File: repository.index[stagedChangeIdx].File}
-					filesRemovedFromIndex = append(filesRemovedFromIndex, repository.index[stagedChangeIdx].File)
 				}
 
-				repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
+				filesRemovedFromIndex = append(filesRemovedFromIndex, repository.index[stagedChangeIdx].File)
 			}
-		} else {
-			// For directories we should iterate over the index and rebuild the node dir, if necessary,
-			// applying the index priority.
 
-			for _, change := range slices.Clone(repository.index) {
-				var filepath string
-
-				if change.ChangeType == directory.Removal {
-					filepath = change.Removal.Filepath
-				} else {
-					filepath = change.File.Filepath
-				}
-
-				if !strings.HasPrefix(filepath, node.Dir.Path) {
-					continue
-				}
-
-				if change.ChangeType != directory.Removal {
-					normalizedPath := filepath[len(node.Dir.Path)+1:]
-					node.Dir.AddNode(normalizedPath, change)
-
-					filesRemovedFromIndex = append(filesRemovedFromIndex, change.File)
-				}
-
-				repository.index = collections.Remove(repository.index, func(item *directory.Change, _ int) bool {
-					return item == change
-				})
-			}
+			repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
 		}
 	} else {
-		if node.NodeType == directory.FileType {
+		// For directories we should iterate over the index and rebuild the node dir, if necessary,
+		// applying the index priority.
 
-			stagedChangeIdx := repository.findStagedChangeIdx(node.File.Filepath)
+		repository.index = collections.Filter(repository.index, func(change *directory.Change, _ int) bool {
+			var filepath string
 
-			if stagedChangeIdx != -1 {
-				// If so, remove the change from the index
-
-				if repository.index[stagedChangeIdx].ChangeType != directory.Removal {
-					// If it is a file modification, the index modification is applied instead of the tree one.
-					filesRemovedFromIndex = append(filesRemovedFromIndex, repository.index[stagedChangeIdx].File)
-				}
-
-				repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
+			if change.ChangeType == directory.Removal {
+				filepath = change.Removal.Filepath
+			} else {
+				filepath = change.File.Filepath
 			}
 
-		} else {
-			repository.index = collections.Filter(repository.index, func(change *directory.Change, _ int) bool {
-				var pathName string
+			if !strings.HasPrefix(filepath, node.Dir.Path) {
+				// If index change is in other directory, keep file
 
-				if change.ChangeType == directory.Removal {
-					pathName = change.Removal.Filepath
-				} else {
-					pathName = change.File.Filepath
+				return true
+			}
+
+			if change.ChangeType != directory.Removal {
+				// If it is a file modification, should also remove its object
+
+				if ref == "HEAD" {
+					// If restoring to HEAD, index is a priority
+
+					normalizedPath := filepath[len(node.Dir.Path)+1:]
+					node.Dir.AddNode(normalizedPath, change)
 				}
 
-				if !strings.HasPrefix(pathName, node.Dir.Path) {
-					return true
-				}
+				filesRemovedFromIndex = append(filesRemovedFromIndex, change.File)
+			}
 
-				if change.ChangeType != directory.Removal {
-					filesRemovedFromIndex = append(filesRemovedFromIndex, change.File)
-				}
-
-				return false
-			})
-		}
+			return false
+		})
 	}
 
 	if node.NodeType == directory.DirType {
