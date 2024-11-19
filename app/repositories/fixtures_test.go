@@ -89,6 +89,15 @@ func fixtureGetBaseProject(t *testing.T) (*fs.Dir, *Repository) {
 	return dir, CreateRepository(dir.Path())
 }
 
+func fixtureNewProject(t *testing.T) (*fs.Dir, *Repository) {
+	dir := fs.NewDir(
+		t,
+		"project",
+	)
+
+	return dir, CreateRepository(dir.Path())
+}
+
 func fixtureGetCustomProject(t *testing.T, makeRepositoryDir func(dir *fs.Dir) fs.PathOp) (*fs.Dir, *Repository) {
 	dir := fs.NewDir(
 		t,
