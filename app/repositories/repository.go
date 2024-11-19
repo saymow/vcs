@@ -439,15 +439,25 @@ func (repository *Repository) resolvePath(path string) (string, *ValidationError
 	return normalizedPath, nil
 }
 
-// Load cover 2 usecases:
+// Restore cover 2 usecases:
 //
 //  1. Restore HEAD + index changes (...and remove the index change).
 //
-//     It can be used to restore the current head + index changes. Index changes
-//     have higher priorities.
+//     It can be used to restore the current head + index changes. Index changes have higher priorities.
+//     Initialy Restore will look for your change in the index, if found, the index change is applied. Otherwise,
+//     Restore will apply the HEAD changes.
 //
-//  2. Load all the content saved up until a checkpoint is created.
-func (repository *Repository) Load(ref string, path string) *ValidationError {
+//  2. Restore Save
+//
+//     It can be used to restore existing Saves to the current working directory.
+//
+// Caveats:
+//
+//   - When applied to directory, Restore will remove all existing changes in the directory (forever) and
+//     restore the Save or HEAD + index.
+//   - You can use Restore to recover a deleted file from the index or from a Save.
+//   - The HEAD is not changed during Restore.
+func (repository *Repository) Restore(ref string, path string) *ValidationError {
 	resolvedPath, err := repository.resolvePath(path)
 	if err != nil {
 		return err
@@ -458,14 +468,6 @@ func (repository *Repository) Load(ref string, path string) *ValidationError {
 		return &ValidationError{fmt.Sprintf("\"%s\" is an invalid ref.", ref)}
 	}
 
-	if save.Id != repository.getCurrentSaveName() {
-		workingDirStatus := repository.GetStatus().WorkingDir
-
-		if len(workingDirStatus.ModifiedFilePaths) > 0 || len(workingDirStatus.UntrackedFilePaths) > 0 {
-			return &ValidationError{"you have unsaved changes in the working dir, you have to save them before loading a save."}
-		}
-	}
-
 	node := buildDirFromSave(repository.fs.Root, save).FindNode(resolvedPath)
 	if node == nil {
 		return &ValidationError{fmt.Sprintf("\"%s\" is a invalid path.", path)}
@@ -473,7 +475,7 @@ func (repository *Repository) Load(ref string, path string) *ValidationError {
 
 	filesRemovedFromIndex := []*directory.File{}
 
-	if save.Id == repository.getCurrentSaveName() {
+	if ref == "HEAD" {
 		// Index files have higher priority over tree files to be restored
 
 		if node.NodeType == directory.FileType {
@@ -522,6 +524,43 @@ func (repository *Repository) Load(ref string, path string) *ValidationError {
 				})
 			}
 		}
+	} else {
+		if node.NodeType == directory.FileType {
+
+			stagedChangeIdx := repository.findStagedChangeIdx(node.File.Filepath)
+
+			if stagedChangeIdx != -1 {
+				// If so, remove the change from the index
+
+				if repository.index[stagedChangeIdx].ChangeType != directory.Removal {
+					// If it is a file modification, the index modification is applied instead of the tree one.
+					filesRemovedFromIndex = append(filesRemovedFromIndex, repository.index[stagedChangeIdx].File)
+				}
+
+				repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
+			}
+
+		} else {
+			repository.index = collections.Filter(repository.index, func(change *directory.Change, _ int) bool {
+				var pathName string
+
+				if change.ChangeType == directory.Removal {
+					pathName = change.Removal.Filepath
+				} else {
+					pathName = change.File.Filepath
+				}
+
+				if !strings.HasPrefix(pathName, node.Dir.Path) {
+					return true
+				}
+
+				if change.ChangeType != directory.Removal {
+					filesRemovedFromIndex = append(filesRemovedFromIndex, change.File)
+				}
+
+				return false
+			})
+		}
 	}
 
 	if node.NodeType == directory.DirType {
@@ -546,9 +585,7 @@ func (repository *Repository) Load(ref string, path string) *ValidationError {
 		repository.fs.RemoveObject(fileRemoved.ObjectName)
 	}
 
-	if ref != "HEAD" {
-		repository.SetHead(ref)
-	}
+	repository.SaveIndex()
 
 	return nil
 }

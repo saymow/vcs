@@ -12,14 +12,12 @@ func Restore(path string) {
 	errors.Check(err)
 
 	repository := repositories.GetRepository(root)
-	err = repository.Load("HEAD", path)
+	err = repository.Restore("HEAD", path)
 
-	if err != nil {
-		if _, ok := err.(*repositories.ValidationError); ok {
-			fmt.Println(err.Error())
-			os.Exit(1)
-		}
-
-		errors.Error(err.Error())
+	if _, ok := err.(*repositories.ValidationError); ok {
+		fmt.Println(err.Error())
+		os.Exit(1)
 	}
+
+	errors.Error(err.Error())
 }

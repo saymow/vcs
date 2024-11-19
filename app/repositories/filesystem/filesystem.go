@@ -487,8 +487,6 @@ func (fileSystem *FileSystem) createFile(file *directory.File) {
 		sourceFile, err = os.Create(file.Filepath)
 		errors.Check(err)
 	}
-
-	errors.Check(err)
 	defer sourceFile.Close()
 
 	objectFile, err := os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, file.ObjectName))

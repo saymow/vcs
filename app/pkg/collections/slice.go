@@ -12,6 +12,18 @@ func Map[T any, F any](slice []T, callback func(T, int) F) []F {
 	return newSlice
 }
 
+func Filter[T any](slice []T, callback func(T, int) bool) []T {
+	newSlice := []T{}
+
+	for idx, element := range slice {
+		if callback(element, idx) {
+			newSlice = append(newSlice, element)
+		}
+	}
+
+	return newSlice
+}
+
 func FindIndex[T comparable](slice []T, callback func(T, int) bool) int {
 	for idx, element := range slice {
 		if callback(element, idx) {
