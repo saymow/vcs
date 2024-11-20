@@ -287,13 +287,8 @@ func (fileSystem *FileSystem) ReadDir(saveName string) directory.Dir {
 	slices.Reverse(changes)
 
 	for _, change := range changes {
-		var normalizedPath string
-
-		if change.ChangeType == directory.Removal {
-			normalizedPath = change.Removal.Filepath[len(fileSystem.Root)+1:]
-		} else {
-			normalizedPath = change.File.Filepath[len(fileSystem.Root)+1:]
-		}
+		normalizedPath, err := dir.NormalizePath(change.GetPath())
+		errors.Check(err)
 
 		dir.AddNode(normalizedPath, &change)
 	}

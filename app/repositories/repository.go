@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	Path "path/filepath"
 	"saymow/version-manager/app/pkg/collections"
@@ -59,7 +58,7 @@ func CreateRepository(root string) *Repository {
 		refs:  &filesystem.Refs{filesystem.INITAL_BRANCH_NAME: ""},
 		head:  filesystem.INITAL_BRANCH_NAME,
 		index: []*directory.Change{},
-		dir:   directory.Dir{},
+		dir:   directory.Dir{Path: root, Children: make(map[string]*directory.Node)},
 	}
 }
 
@@ -103,11 +102,9 @@ func (repository *Repository) IndexFile(filepath string) error {
 		return &ValidationError{"cannot make changes in detached mode."}
 	}
 
-	if !Path.IsAbs(filepath) {
-		filepath = Path.Join(repository.fs.Root, filepath)
-	}
-	if !strings.HasPrefix(filepath, repository.fs.Root) {
-		log.Fatal("Invalid file path.")
+	filepath, err := repository.dir.AbsPath(filepath)
+	if err != nil {
+		return &ValidationError{err.Error()}
 	}
 
 	file, err := os.Open(filepath)
@@ -162,15 +159,13 @@ func (repository *Repository) RemoveFile(filepath string) error {
 		return &ValidationError{"cannot make changes in detached mode."}
 	}
 
-	if !Path.IsAbs(filepath) {
-		filepath = Path.Join(repository.fs.Root, filepath)
-	}
-	if !strings.HasPrefix(filepath, repository.fs.Root) {
-		log.Fatal("Invalid file path.")
+	filepath, err := repository.dir.AbsPath(filepath)
+	if err != nil {
+		return &ValidationError{err.Error()}
 	}
 
 	// Remove from working dir
-	err := os.Remove(filepath)
+	err = os.Remove(filepath)
 	if err != nil && !os.IsNotExist(err) {
 		errors.Error(err.Error())
 	}
@@ -227,7 +222,7 @@ func (repository *Repository) CreateSave(message string) (*filesystem.Checkpoint
 		return nil, &ValidationError{"cannot make changes in detached mode."}
 	}
 	if len(repository.index) == 0 {
-		return nil, &ValidationError{"Cannot save empty index."}
+		return nil, &ValidationError{"cannot save empty index."}
 	}
 
 	save := filesystem.Checkpoint{
@@ -245,18 +240,13 @@ func (repository *Repository) CreateSave(message string) (*filesystem.Checkpoint
 }
 
 func (repository *Repository) findStagedChangeIdx(filepath string) int {
-	return collections.FindIndex(repository.index, func(item *directory.Change, _ int) bool {
-		if item.ChangeType == directory.Removal {
-			return item.Removal.Filepath == filepath
-		}
-
-		return item.File.Filepath == filepath
+	return collections.FindIndex(repository.index, func(change *directory.Change, _ int) bool {
+		return change.GetPath() == filepath
 	})
 }
 
 func (repository *Repository) findStagedChange(filepath string) *directory.Change {
 	idx := repository.findStagedChangeIdx(filepath)
-
 	if idx == -1 {
 		return nil
 	}
@@ -265,9 +255,10 @@ func (repository *Repository) findStagedChange(filepath string) *directory.Chang
 }
 
 func (repository *Repository) findSavedFile(filepath string) *directory.File {
-	normalizedPath := filepath[len(repository.fs.Root)+1:]
-	node := repository.dir.FindNode(normalizedPath)
+	normalizedPath, err := repository.dir.NormalizePath(filepath)
+	errors.Check(err)
 
+	node := repository.dir.FindNode(normalizedPath)
 	if node == nil || node.NodeType != directory.FileType {
 		return nil
 	}
@@ -285,11 +276,7 @@ func (repository *Repository) GetStatus() *Status {
 	}
 
 	for _, change := range repository.index {
-		if change.ChangeType == directory.Removal {
-			trackedPaths.Insert(change.Removal.Filepath)
-		} else {
-			trackedPaths.Insert(change.File.Filepath)
-		}
+		trackedPaths.Insert(change.GetPath())
 	}
 
 	Path.Walk(repository.fs.Root, func(filepath string, info fs.FileInfo, err error) error {
@@ -384,7 +371,6 @@ func (repository *Repository) getSave(ref string) *filesystem.Save {
 			return nil
 		}
 	}
-
 	if ref == "HEAD" {
 		ref = repository.head
 	}
@@ -405,13 +391,8 @@ func buildDirFromSave(root string, save *filesystem.Save) *directory.Dir {
 
 	for _, checkpoint := range save.Checkpoints {
 		for _, change := range checkpoint.Changes {
-			var normalizedPath string
-
-			if change.ChangeType == directory.Removal {
-				normalizedPath = change.Removal.Filepath[len(root)+1:]
-			} else {
-				normalizedPath = change.File.Filepath[len(root)+1:]
-			}
+			normalizedPath, err := dir.NormalizePath(change.GetPath())
+			errors.Check(err)
 
 			dir.AddNode(normalizedPath, change)
 		}
@@ -421,19 +402,10 @@ func buildDirFromSave(root string, save *filesystem.Save) *directory.Dir {
 }
 
 func (repository *Repository) resolvePath(path string) (string, *ValidationError) {
-	if !Path.IsAbs(path) {
-		path = Path.Join(repository.fs.Root, path)
-	}
-	if !strings.HasPrefix(path, repository.fs.Root) {
-		return "", &ValidationError{fmt.Sprintf("\"%s\" is an invalid path.", path)}
-	}
+	normalizedPath, err := repository.dir.NormalizePath(path)
 
-	var normalizedPath string
-
-	if path == repository.fs.Root {
-		normalizedPath = path[len(repository.fs.Root):]
-	} else {
-		normalizedPath = path[len(repository.fs.Root)+1:]
+	if err != nil {
+		return "", &ValidationError{err.Error()}
 	}
 
 	return normalizedPath, nil
@@ -501,13 +473,7 @@ func (repository *Repository) Restore(ref string, path string) *ValidationError 
 		// applying the index priority.
 
 		repository.index = collections.Filter(repository.index, func(change *directory.Change, _ int) bool {
-			var filepath string
-
-			if change.ChangeType == directory.Removal {
-				filepath = change.Removal.Filepath
-			} else {
-				filepath = change.File.Filepath
-			}
+			filepath := change.GetPath()
 
 			if !strings.HasPrefix(filepath, node.Dir.Path) {
 				// If index change is in other directory, keep file
@@ -521,7 +487,9 @@ func (repository *Repository) Restore(ref string, path string) *ValidationError 
 				if ref == "HEAD" {
 					// If restoring to HEAD, index is a priority
 
-					normalizedPath := filepath[len(node.Dir.Path)+1:]
+					normalizedPath, err := node.Dir.NormalizePath(filepath)
+					errors.Check(err)
+
 					node.Dir.AddNode(normalizedPath, change)
 				}
 

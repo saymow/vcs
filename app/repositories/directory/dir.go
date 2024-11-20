@@ -1,7 +1,7 @@
 package directory
 
 import (
-	fp "path/filepath"
+	Path "path/filepath"
 	"strings"
 )
 
@@ -52,6 +52,22 @@ const (
 	REMOVAL_CHANGE  = "(removed)"
 )
 
+type DirError struct {
+	message string
+}
+
+func (err *DirError) Error() string {
+	return err.message
+}
+
+func (change *Change) GetPath() string {
+	if change.ChangeType == Removal {
+		return change.Removal.Filepath
+	}
+
+	return change.File.Filepath
+}
+
 func (root *Dir) addNodeHelper(segments []string, change *Change) {
 	if len(segments) == 1 {
 		if change.ChangeType == Removal {
@@ -75,7 +91,7 @@ func (root *Dir) addNodeHelper(segments []string, change *Change) {
 		node = &Node{
 			NodeType: DirType,
 			Dir: &Dir{
-				Path:     fp.Join(root.Path, dirNodeName),
+				Path:     Path.Join(root.Path, dirNodeName),
 				Children: make(map[string]*Node),
 			},
 		}
@@ -92,7 +108,7 @@ func (root *Dir) addNodeHelper(segments []string, change *Change) {
 }
 
 func (root *Dir) AddNode(path string, change *Change) {
-	segments := strings.Split(path, string(fp.Separator))
+	segments := strings.Split(path, string(Path.Separator))
 
 	root.addNodeHelper(segments, change)
 }
@@ -117,12 +133,12 @@ func (root *Dir) findNodeHelper(segments []string) *Node {
 }
 
 func (root *Dir) FindNode(path string) *Node {
-	if path == "" || path == string(fp.Separator) {
+	if path == "" || path == string(Path.Separator) {
 		// edge case to handle all paths for this dir
 		return &Node{NodeType: DirType, Dir: root}
 	}
 
-	segments := strings.Split(path, string(fp.Separator))
+	segments := strings.Split(path, string(Path.Separator))
 
 	return root.findNodeHelper(segments)
 }
@@ -161,4 +177,47 @@ func (root *Dir) PreOrderTraversal() []*Node {
 	root.preOrderTraversalHelper(&nodes)
 
 	return nodes
+}
+
+func (root *Dir) isSubpath(path string) bool {
+	rootParts := strings.Split(root.Path, string((Path.Separator)))
+	parts := strings.Split(path, string((Path.Separator)))
+
+	if len(rootParts) > len(parts) {
+		return false
+	}
+
+	idx := 0
+	for idx < len(rootParts) {
+		if rootParts[idx] != parts[idx] {
+			return false
+		}
+		idx++
+	}
+
+	return true
+}
+
+func (root *Dir) NormalizePath(path string) (string, error) {
+	path, err := root.AbsPath(path)
+	if err != nil {
+		return "", err
+	}
+	if path == root.Path {
+		// it seems a path is subpath of it self
+		return "", nil
+	}
+
+	return path[len(root.Path)+1:], nil
+}
+
+func (root *Dir) AbsPath(path string) (string, error) {
+	if !Path.IsAbs(path) {
+		path = Path.Join(root.Path, path)
+	}
+	if !root.isSubpath(path) {
+		return "", &DirError{"invalid path."}
+	}
+
+	return path, nil
 }
