@@ -1621,7 +1621,7 @@ func TestInvalidRef(t *testing.T) {
 		repository.SaveIndex()
 		save1, _ := repository.CreateSave("save message")
 
-		testifyAssert.Error(t, repository.CreateRef("feat/a"), "name already in use.")
+		testifyAssert.Error(t, repository.CreateRef("master"), "name already in use.")
 		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
 			"master": save0.Id,
 			"feat/a": save1.Id,
