@@ -218,7 +218,7 @@ func (repository *Repository) setRef(name, saveName string) {
 	repository.fs.WriteRefs(repository.refs)
 }
 
-func (repository *Repository) SetHead(newHead string) {
+func (repository *Repository) setHead(newHead string) {
 	repository.head = newHead
 	repository.fs.WriteHead(repository.head)
 }
@@ -443,12 +443,12 @@ func (repository *Repository) Restore(ref string, path string) error {
 
 	save := repository.getSave(ref)
 	if save == nil {
-		return &ValidationError{fmt.Sprintf("\"%s\" is an invalid ref.", ref)}
+		return &ValidationError{"invalid ref."}
 	}
 
 	node := buildDirFromSave(repository.fs.Root, save).FindNode(resolvedPath)
 	if node == nil {
-		return &ValidationError{fmt.Sprintf("\"%s\" is a invalid path.", path)}
+		return &ValidationError{"invalid path."}
 	}
 
 	filesRemovedFromIndex := []*directory.File{}
@@ -515,7 +515,7 @@ func (repository *Repository) Restore(ref string, path string) error {
 			nodes = nodes[1:]
 		}
 
-		repository.fs.SafeRemoveDir(node.Dir)
+		repository.fs.SafeRemoveWorkingDir(node.Dir)
 
 		for _, node := range nodes {
 			repository.fs.CreateNode(node)
@@ -529,6 +529,36 @@ func (repository *Repository) Restore(ref string, path string) error {
 	}
 
 	repository.SaveIndex()
+
+	return nil
+}
+
+func (repository *Repository) Load(ref string) error {
+	save := repository.getSave(ref)
+	if save == nil {
+		return &ValidationError{"invalid ref."}
+	}
+
+	status := repository.GetStatus()
+	if len(status.WorkingDir.ModifiedFilePaths)+
+		len(status.WorkingDir.RemovedFilePaths)+
+		len(status.WorkingDir.UntrackedFilePaths) > 0 {
+		return &ValidationError{"unsaved changes."}
+	}
+
+	dir := buildDirFromSave(repository.fs.Root, save)
+
+	nodes := dir.PreOrderTraversal()
+	// if we are traversing the root dir, the root-dir-file should be removed from the response.
+	nodes = nodes[1:]
+
+	repository.fs.SafeRemoveWorkingDir(dir)
+
+	for _, node := range nodes {
+		repository.fs.CreateNode(node)
+	}
+
+	repository.setHead(ref)
 
 	return nil
 }
@@ -580,6 +610,6 @@ func (repository *Repository) CreateRef(name string) error {
 	}
 
 	repository.setRef(name, repository.getCurrentSaveName())
-	repository.SetHead(name)
+	repository.setHead(name)
 	return nil
 }

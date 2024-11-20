@@ -521,7 +521,7 @@ func (fileSystem *FileSystem) CreateNode(node *directory.Node) {
 // Safely remove a directory
 //
 // This helper prevents the .repository dir to be removed
-func (fileSystem *FileSystem) SafeRemoveDir(dir *directory.Dir) {
+func (fileSystem *FileSystem) SafeRemoveWorkingDir(dir *directory.Dir) {
 	if dir.Path != fileSystem.Root {
 		err := os.RemoveAll(dir.Path)
 		errors.Check(err)
