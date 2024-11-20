@@ -558,5 +558,6 @@ func (repository *Repository) CreateRef(name string) *ValidationError {
 	}
 
 	repository.setRef(name, repository.getCurrentSaveName())
+	repository.SetHead(name)
 	return nil
 }
