@@ -2,31 +2,34 @@ package directory
 
 import (
 	"fmt"
-	path "path/filepath"
+	"os"
+	Path "path/filepath"
+	"runtime"
+	"saymow/version-manager/app/pkg/errors"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-const PATH_SEPARATOR = string(path.Separator)
+const PATH_SEPARATOR = string(Path.Separator)
 
 func TestAddNode(t *testing.T) {
 	dir := &Dir{
-		Path:     path.Join("home", "project"),
+		Path:     Path.Join("home", "project"),
 		Children: make(map[string]*Node),
 	}
 
 	dir.AddNode("a.txt", &Change{ChangeType: Modification, File: &File{Filepath: "home/project/a.txt"}})
 
-	assert.Equal(t, dir.Path, path.Join("home", "project"))
+	assert.Equal(t, dir.Path, Path.Join("home", "project"))
 	assert.Equal(t, len(dir.Children), 1)
 	assert.Equal(t, dir.Children["a.txt"].File, &File{Filepath: "home/project/a.txt"})
 }
 
 func TestAddNodeNestedPath(t *testing.T) {
 	dir := &Dir{
-		Path:     path.Join("home", "project"),
+		Path:     Path.Join("home", "project"),
 		Children: make(map[string]*Node),
 	}
 
@@ -39,21 +42,21 @@ func TestAddNodeNestedPath(t *testing.T) {
 	dir.AddNode(fmt.Sprintf("a%sc%s7.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{ChangeType: Modification, File: &File{Filepath: "home/project/a/c/7.txt"}})
 	dir.AddNode(fmt.Sprintf("a%sc%s8.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{ChangeType: Modification, File: &File{Filepath: "home/project/a/c/8.txt"}})
 
-	assert.Equal(t, dir.Path, path.Join("home", "project"))
+	assert.Equal(t, dir.Path, Path.Join("home", "project"))
 	assert.Equal(t, len(dir.Children), 2)
 	assert.Equal(t, dir.Children["1.txt"].File, &File{Filepath: "home/project/1.txt"})
 	assert.Equal(t, dir.Children["a"].NodeType, DirType)
-	assert.Equal(t, dir.Children["a"].Dir.Path, path.Join("home", "project", "a"))
+	assert.Equal(t, dir.Children["a"].Dir.Path, Path.Join("home", "project", "a"))
 	assert.Equal(t, len(dir.Children["a"].Dir.Children), 4)
 	assert.Equal(t, dir.Children["a"].Dir.Children["2.txt"].File, &File{Filepath: "home/project/a/2.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["3.txt"].File, &File{Filepath: "home/project/a/3.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["b"].NodeType, DirType)
-	assert.Equal(t, dir.Children["a"].Dir.Children["b"].Dir.Path, path.Join("home", "project", "a", "b"))
+	assert.Equal(t, dir.Children["a"].Dir.Children["b"].Dir.Path, Path.Join("home", "project", "a", "b"))
 	assert.Equal(t, len(dir.Children["a"].Dir.Children["b"].Dir.Children), 3)
 	assert.Equal(t, dir.Children["a"].Dir.Children["b"].Dir.Children["4.txt"].File, &File{Filepath: "home/project/a/b/4.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["b"].Dir.Children["5.txt"].File, &File{Filepath: "home/project/a/b/5.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["b"].Dir.Children["6.txt"].File, &File{Filepath: "home/project/a/b/6.txt"})
-	assert.Equal(t, dir.Children["a"].Dir.Children["c"].Dir.Path, path.Join("home", "project", "a", "c"))
+	assert.Equal(t, dir.Children["a"].Dir.Children["c"].Dir.Path, Path.Join("home", "project", "a", "c"))
 	assert.Equal(t, len(dir.Children["a"].Dir.Children["c"].Dir.Children), 2)
 	assert.Equal(t, dir.Children["a"].Dir.Children["c"].Dir.Children["7.txt"].File, &File{Filepath: "home/project/a/c/7.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["c"].Dir.Children["8.txt"].File, &File{Filepath: "home/project/a/c/8.txt"})
@@ -61,7 +64,7 @@ func TestAddNodeNestedPath(t *testing.T) {
 
 func TestAddNodeRemovalChanges(t *testing.T) {
 	dir := &Dir{
-		Path:     path.Join("home", "project"),
+		Path:     Path.Join("home", "project"),
 		Children: make(map[string]*Node),
 	}
 
@@ -70,14 +73,14 @@ func TestAddNodeRemovalChanges(t *testing.T) {
 	dir.AddNode("a.txt", &Change{ChangeType: Removal, Removal: &FileRemoval{Filepath: "home/project/a.txt"}})
 	dir.AddNode("c.txt", &Change{ChangeType: Removal, Removal: &FileRemoval{Filepath: "home/project/c.txt"}})
 
-	assert.Equal(t, dir.Path, path.Join("home", "project"))
+	assert.Equal(t, dir.Path, Path.Join("home", "project"))
 	assert.Equal(t, len(dir.Children), 1)
 	assert.Equal(t, dir.Children["b.txt"].File, &File{Filepath: "home/project/b.txt"})
 }
 
 func TestAddNodeOverrideRemovalChanges(t *testing.T) {
 	dir := &Dir{
-		Path:     path.Join("home", "project"),
+		Path:     Path.Join("home", "project"),
 		Children: make(map[string]*Node),
 	}
 
@@ -85,19 +88,19 @@ func TestAddNodeOverrideRemovalChanges(t *testing.T) {
 	dir.AddNode("a.txt", &Change{ChangeType: Removal, Removal: &FileRemoval{Filepath: "home/project/a.txt"}})
 	dir.AddNode("a.txt", &Change{ChangeType: Modification, File: &File{Filepath: "home/project/a.txt", ObjectName: "newer-version"}})
 
-	assert.Equal(t, dir.Path, path.Join("home", "project"))
+	assert.Equal(t, dir.Path, Path.Join("home", "project"))
 	assert.Equal(t, len(dir.Children), 1)
 	assert.Equal(t, dir.Children["a.txt"].File, &File{Filepath: "home/project/a.txt", ObjectName: "newer-version"})
 }
 
 func TestAddNodeRemovalChangesRemovesEmptyDir(t *testing.T) {
 	dir := &Dir{
-		Path: path.Join("home", "project"),
+		Path: Path.Join("home", "project"),
 		Children: map[string]*Node{
 			"dir": {
 				NodeType: DirType,
 				Dir: &Dir{
-					Path: path.Join("home", "project", "dir"),
+					Path: Path.Join("home", "project", "dir"),
 					Children: map[string]*Node{
 						"a.txt": {
 							NodeType: FileType,
@@ -119,16 +122,16 @@ func TestAddNodeRemovalChangesRemovesEmptyDir(t *testing.T) {
 		},
 	}
 
-	dir.AddNode(path.Join("dir", "a.txt"), &Change{ChangeType: Removal, Removal: &FileRemoval{Filepath: "home/project/dir/a.txt"}})
+	dir.AddNode(Path.Join("dir", "a.txt"), &Change{ChangeType: Removal, Removal: &FileRemoval{Filepath: "home/project/dir/a.txt"}})
 	assert.Equal(t, len(dir.Children), 1)
 	assert.Equal(t, dir.Children["dir"].NodeType, DirType)
-	dir.AddNode(path.Join("dir", "b.txt"), &Change{ChangeType: Removal, Removal: &FileRemoval{Filepath: "home/project/dir/b.txt"}})
+	dir.AddNode(Path.Join("dir", "b.txt"), &Change{ChangeType: Removal, Removal: &FileRemoval{Filepath: "home/project/dir/b.txt"}})
 	assert.Equal(t, len(dir.Children), 0)
 }
 
 func TestAddNodeRemovalChangesNestedPath(t *testing.T) {
 	dir := &Dir{
-		Path:     path.Join("home", "project"),
+		Path:     Path.Join("home", "project"),
 		Children: make(map[string]*Node),
 	}
 
@@ -141,7 +144,7 @@ func TestAddNodeRemovalChangesNestedPath(t *testing.T) {
 	dir.AddNode(fmt.Sprintf("a%sc%s7.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{ChangeType: Modification, File: &File{Filepath: "home/project/a/c/7.txt"}})
 	dir.AddNode(fmt.Sprintf("a%sc%s8.txt", PATH_SEPARATOR, PATH_SEPARATOR), &Change{ChangeType: Modification, File: &File{Filepath: "home/project/a/c/8.txt"}})
 
-	assert.Equal(t, dir.Path, path.Join("home", "project"))
+	assert.Equal(t, dir.Path, Path.Join("home", "project"))
 	assert.Equal(t, len(dir.Children), 2)
 	assert.Equal(t, dir.Children["1.txt"].File, &File{Filepath: "home/project/1.txt"})
 	assert.Equal(t, dir.Children["a"].NodeType, DirType)
@@ -149,13 +152,13 @@ func TestAddNodeRemovalChangesNestedPath(t *testing.T) {
 	assert.Equal(t, dir.Children["a"].Dir.Children["2.txt"].File, &File{Filepath: "home/project/a/2.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["3.txt"].File, &File{Filepath: "home/project/a/3.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["b"].NodeType, DirType)
-	assert.Equal(t, dir.Children["a"].Dir.Children["b"].Dir.Path, path.Join("home", "project", "a", "b"))
+	assert.Equal(t, dir.Children["a"].Dir.Children["b"].Dir.Path, Path.Join("home", "project", "a", "b"))
 	assert.Equal(t, len(dir.Children["a"].Dir.Children["b"].Dir.Children), 3)
 	assert.Equal(t, dir.Children["a"].Dir.Children["b"].Dir.Children["4.txt"].File, &File{Filepath: "home/project/a/b/4.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["b"].Dir.Children["5.txt"].File, &File{Filepath: "home/project/a/b/5.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["b"].Dir.Children["6.txt"].File, &File{Filepath: "home/project/a/b/6.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["b"].NodeType, DirType)
-	assert.Equal(t, dir.Children["a"].Dir.Children["c"].Dir.Path, path.Join("home", "project", "a", "c"))
+	assert.Equal(t, dir.Children["a"].Dir.Children["c"].Dir.Path, Path.Join("home", "project", "a", "c"))
 	assert.Equal(t, len(dir.Children["a"].Dir.Children["c"].Dir.Children), 2)
 	assert.Equal(t, dir.Children["a"].Dir.Children["c"].Dir.Children["7.txt"].File, &File{Filepath: "home/project/a/c/7.txt"})
 	assert.Equal(t, dir.Children["a"].Dir.Children["c"].Dir.Children["8.txt"].File, &File{Filepath: "home/project/a/c/8.txt"})
@@ -204,7 +207,7 @@ func TestAddNodeRemovalChangesNestedPath(t *testing.T) {
 
 func TestFindNode(t *testing.T) {
 	dir := &Dir{
-		Path: path.Join("home", "project"),
+		Path: Path.Join("home", "project"),
 		Children: map[string]*Node{
 			"a.txt": {
 				NodeType: FileType,
@@ -304,7 +307,7 @@ func TestFindNodeNestedPath(t *testing.T) {
 	assert.Equal(t, dir.FindNode(fmt.Sprintf("subdir%sa.txt", PATH_SEPARATOR)).File, &File{"home/project/subdir/a.txt", "object-subdir-a"})
 	assert.Equal(t, dir.FindNode(fmt.Sprintf("subdir%sc.txt", PATH_SEPARATOR)).NodeType, FileType)
 	assert.Equal(t, dir.FindNode(fmt.Sprintf("subdir%sc.txt", PATH_SEPARATOR)).File, &File{"home/project/subdir/c.txt", "object-subdir-c"})
-	assert.Equal(t, dir.FindNode(path.Join("subdir", "nested-subdir")).NodeType, DirType)
+	assert.Equal(t, dir.FindNode(Path.Join("subdir", "nested-subdir")).NodeType, DirType)
 	assert.Equal(t, dir.FindNode(fmt.Sprintf("subdir%snested-subdir%sb.txt", PATH_SEPARATOR, PATH_SEPARATOR)).NodeType, FileType)
 	assert.Equal(t, dir.FindNode(fmt.Sprintf("subdir%snested-subdir%sb.txt", PATH_SEPARATOR, PATH_SEPARATOR)).File, &File{"home/project/subdir/nested-subdir/b.txt", "object-subdir-nested-subdir-b"})
 	assert.Equal(t, dir.FindNode(fmt.Sprintf("subdir%snested-subdir%sd.txt", PATH_SEPARATOR, PATH_SEPARATOR)).NodeType, FileType)
@@ -423,7 +426,7 @@ func TestPreOrderTraversal(t *testing.T) {
 						"nested-subdir": {
 							NodeType: DirType,
 							Dir: &Dir{
-								Path: path.Join("subdir", "nested-subdir"),
+								Path: Path.Join("subdir", "nested-subdir"),
 								Children: map[string]*Node{
 									"b.txt": {
 										NodeType: FileType,
@@ -449,7 +452,7 @@ func TestPreOrderTraversal(t *testing.T) {
 	assert.EqualValues(t, received[1].NodeType, DirType)
 	assert.EqualValues(t, received[1].Dir.Path, "subdir")
 	assert.EqualValues(t, received[2].NodeType, DirType)
-	assert.EqualValues(t, received[2].Dir.Path, path.Join("subdir", "nested-subdir"))
+	assert.EqualValues(t, received[2].Dir.Path, Path.Join("subdir", "nested-subdir"))
 	assert.EqualValues(t,
 		received[3],
 		&Node{
@@ -460,4 +463,94 @@ func TestPreOrderTraversal(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestNormalizePath(t *testing.T) {
+	base := Path.Join("home", "project")
+	dir := &Dir{
+		Path:     base,
+		Children: make(map[string]*Node),
+	}
+
+	filepath, err := dir.NormalizePath(Path.Join(base, "1.txt"))
+	assert.Nil(t, err)
+	assert.Equal(t, filepath, "1.txt")
+
+	filepath, err = dir.NormalizePath(Path.Join(base, "a", "1.txt"))
+	assert.Nil(t, err)
+	assert.Equal(t, filepath, Path.Join("a", "1.txt"))
+
+	filepath, err = dir.NormalizePath(Path.Join(base, "a", "b", "1.txt"))
+	assert.Nil(t, err)
+	assert.Equal(t, filepath, Path.Join("a", "b", "1.txt"))
+
+	filepath, err = dir.NormalizePath(Path.Join(base, "folder"))
+	assert.Nil(t, err)
+	assert.Equal(t, filepath, "folder")
+
+	filepath, err = dir.NormalizePath(Path.Join(base, "a", "b"))
+	assert.Nil(t, err)
+	assert.Equal(t, filepath, Path.Join("a", "b"))
+
+	filepath, err = dir.NormalizePath(base)
+	assert.Nil(t, err)
+	assert.Equal(t, filepath, "")
+
+	filepath, err = dir.NormalizePath(Path.Join("a", "b"))
+	assert.Error(t, err, "invalid path.")
+	assert.Equal(t, filepath, "")
+
+	filepath, err = dir.NormalizePath(Path.Join("home", "a"))
+	assert.Error(t, err, "invalid path.")
+	assert.Equal(t, filepath, "")
+
+	filepath, err = dir.NormalizePath(Path.Join("home", "projectads", "a"))
+	assert.Error(t, err, "invalid path.")
+	assert.Equal(t, filepath, "")
+}
+
+func getOsRoot() string {
+	if runtime.GOOS == "windows" {
+		return "C:\\"
+	}
+
+	return "/"
+}
+
+func TestAbsPath(t *testing.T) {
+	base, err := os.Getwd()
+	errors.Check(err)
+
+	dir := &Dir{
+		Path:     base,
+		Children: make(map[string]*Node),
+	}
+
+	filepath, err := dir.AbsPath(Path.Join(base, "1.txt"))
+	assert.Nil(t, err)
+	assert.Equal(t, filepath, Path.Join(base, "1.txt"))
+
+	filepath, err = dir.AbsPath(Path.Join(base, "a", "1.txt"))
+	assert.Nil(t, err)
+	assert.Equal(t, filepath, Path.Join(base, "a", "1.txt"))
+
+	filepath, err = dir.AbsPath("1.txt")
+	assert.Nil(t, err)
+	assert.Equal(t, filepath, Path.Join(base, "1.txt"))
+
+	filepath, err = dir.AbsPath(Path.Join("a", "1.txt"))
+	assert.Nil(t, err)
+	assert.Equal(t, filepath, Path.Join(base, "a", "1.txt"))
+
+	filepath, err = dir.AbsPath(Path.Join(getOsRoot(), "a", "b"))
+	assert.Error(t, err, "invalid path.")
+	assert.Equal(t, filepath, "")
+
+	filepath, err = dir.AbsPath(Path.Join(getOsRoot(), "home", "a"))
+	assert.Error(t, err, "invalid path.")
+	assert.Equal(t, filepath, "")
+
+	filepath, err = dir.AbsPath(Path.Join(getOsRoot(), "home", "projectads", "a"))
+	assert.Error(t, err, "invalid path.")
+	assert.Equal(t, filepath, "")
 }

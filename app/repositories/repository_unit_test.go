@@ -1,7 +1,6 @@
 package repositories
 
 import (
-	"fmt"
 	Path "path/filepath"
 	"testing"
 
@@ -41,5 +40,5 @@ func TestResolvePath(t *testing.T) {
 	assert.Equal(t, path, Path.Join("a", "b", "c"))
 
 	_, err = repository.resolvePath(dir.Join(".."))
-	assert.Error(t, err, fmt.Sprintf("\"%s\" is is an invalid path.", dir.Join("..")))
+	assert.Error(t, err, "invalid path.")
 }
