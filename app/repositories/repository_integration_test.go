@@ -1493,30 +1493,28 @@ func TestRefs(t *testing.T) {
 	defer dir.Remove()
 
 	// Multiples refs to the same save
-	{
-		// Setup
-		repository.CreateRef("feat/a")
-		repository.CreateRef("feat/b")
+	// Setup
+	fixtures.WriteFile(dir.Join("new.txt"), []byte("it does matter."))
 
-		// Test
-		repository = GetRepository(dir.Path())
-		assert.Assert(
-			t,
-			fs.Equal(
-				dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
-				fs.Expected(
-					t,
-					fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_REF_NAME),
-					fs.MatchExtraFiles,
-				),
-			),
-		)
-		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
-			"master": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
-			"feat/a": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
-			"feat/b": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
-		})
-	}
+	repository.IndexFile("new.txt")
+	repository.SaveIndex()
+	save0, _ := repository.CreateSave("save message")
+
+	repository.CreateRef("feat/a")
+	repository.CreateRef("feat/b")
+
+	// Test
+	repository = GetRepository(dir.Path())
+	testifyAssert.Equal(
+		t,
+		fixtures.ReadFile(dir.Join(filesystem.REPOSITORY_FOLDER_NAME, filesystem.HEAD_FILE_NAME)),
+		"feat/b",
+	)
+	testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
+		"master": save0.Id,
+		"feat/a": save0.Id,
+		"feat/b": save0.Id,
+	})
 
 	// Save (move current save as a side effect) and create refs
 	{
@@ -1527,16 +1525,21 @@ func TestRefs(t *testing.T) {
 
 		repository.IndexFile("new.txt")
 		repository.SaveIndex()
-		save0, _ := repository.CreateSave("save message")
+		save1, _ := repository.CreateSave("save message")
 
 		// Test
 		repository.CreateRef("feat/c")
 
+		testifyAssert.Equal(
+			t,
+			fixtures.ReadFile(dir.Join(filesystem.REPOSITORY_FOLDER_NAME, filesystem.HEAD_FILE_NAME)),
+			"feat/c",
+		)
 		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
 			"master": save0.Id,
-			"feat/a": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
-			"feat/b": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
-			"feat/c": save0.Id,
+			"feat/a": save0.Id,
+			"feat/b": save1.Id,
+			"feat/c": save1.Id,
 		})
 
 		// Setup
@@ -1548,15 +1551,11 @@ func TestRefs(t *testing.T) {
 		repository.SaveIndex()
 		lastSave, _ := repository.CreateSave("save message")
 
-		// Test
-		repository.CreateRef("feat/d")
-
 		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
-			"master": lastSave.Id,
-			"feat/a": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
-			"feat/b": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
-			"feat/c": save0.Id,
-			"feat/d": lastSave.Id,
+			"master": save0.Id,
+			"feat/a": save0.Id,
+			"feat/b": save1.Id,
+			"feat/c": lastSave.Id,
 		})
 	}
 }
@@ -1575,7 +1574,6 @@ func TestInvalidRef(t *testing.T) {
 
 	// Name already in use
 	{
-
 		fixtures.WriteFile(dir.Join("new.txt"), []byte("it does not matter."))
 
 		repository.IndexFile("new.txt")
@@ -1585,6 +1583,7 @@ func TestInvalidRef(t *testing.T) {
 		repository = GetRepository(dir.Path())
 
 		repository.CreateRef("feat/a")
+
 		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
 			"master": save0.Id,
 			"feat/a": save0.Id,
@@ -1598,8 +1597,8 @@ func TestInvalidRef(t *testing.T) {
 
 		testifyAssert.Error(t, repository.CreateRef("feat/a"), "name already in use.")
 		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
-			"master": save1.Id,
-			"feat/a": save0.Id,
+			"master": save0.Id,
+			"feat/a": save1.Id,
 		})
 	}
 }
