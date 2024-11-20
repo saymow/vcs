@@ -7,12 +7,12 @@ import (
 	"saymow/version-manager/app/repositories"
 )
 
-func Restore(path string) {
+func Restore(path string, ref string) {
 	root, err := os.Getwd()
 	errors.Check(err)
 
 	repository := repositories.GetRepository(root)
-	err = repository.Restore("HEAD", path)
+	err = repository.Restore(ref, path)
 
 	if err != nil {
 		if _, ok := err.(*repositories.ValidationError); ok {

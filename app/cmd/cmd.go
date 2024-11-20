@@ -21,6 +21,7 @@ var CLI struct {
 	Status struct {
 	} `cmd:"" help:"Show the repository status."`
 	Restore struct {
+		Ref  string `optional:"" short="r" default:"HEAD" name:"ref" help:The Ref or Save hash to restore from. If omitted, HEAD is used.`
 		Path string `arg:"" name:"path" help:"Path to be restored."`
 	} `cmd:"" help:"Restore files from index or file tree."`
 	Logs struct {
@@ -51,7 +52,7 @@ func Start() {
 	case "save <message>":
 		handlers.Save(ctx.Args[1])
 	case "restore <path>":
-		handlers.Restore(ctx.Args[1])
+		handlers.Restore(CLI.Restore.Path, CLI.Restore.Ref)
 	case "ref <name>":
 		handlers.CreateRef(ctx.Args[1])
 	default:
