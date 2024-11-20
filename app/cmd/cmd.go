@@ -25,6 +25,8 @@ var CLI struct {
 	} `cmd:"" help:"Restore files from index or file tree."`
 	Logs struct {
 	} `cmd:"" help:"Show the repository saves logs."`
+	Refs struct {
+	} `cmd:"" help:"Show the repository saves refs."`
 }
 
 func Start() {
@@ -37,6 +39,8 @@ func Start() {
 		handlers.Status()
 	case "logs":
 		handlers.Logs()
+	case "refs":
+		handlers.Refs()
 	case "add <path>":
 		handlers.TrackFiles(ctx.Args[1:])
 	case "rm <path>":
