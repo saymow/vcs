@@ -1,4 +1,4 @@
-package filesystem
+package filesystems
 
 import (
 	"bufio"
@@ -12,7 +12,7 @@ import (
 	"os"
 	path "path/filepath"
 	"saymow/version-manager/app/pkg/errors"
-	"saymow/version-manager/app/repositories/directory"
+	"saymow/version-manager/app/repositories/directories"
 	"slices"
 	"strings"
 	"time"
@@ -39,7 +39,7 @@ type Checkpoint struct {
 	Message   string
 	CreatedAt time.Time
 	Parent    string
-	Changes   []*directory.Change
+	Changes   []*directories.Change
 }
 
 type FileSystem struct {
@@ -86,7 +86,7 @@ func Open(root string) *FileSystem {
 	return &FileSystem{Root: root}
 }
 
-func (fileSystem *FileSystem) SaveIndex(index []*directory.Change) {
+func (fileSystem *FileSystem) SaveIndex(index []*directories.Change) {
 	file, err := os.OpenFile(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
 	errors.Check(err)
 
@@ -94,19 +94,19 @@ func (fileSystem *FileSystem) SaveIndex(index []*directory.Change) {
 	errors.Check(err)
 
 	for _, change := range index {
-		if change.ChangeType == directory.Modification {
-			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.File.Filepath, directory.MODIFIED_CHANGE, change.File.ObjectName)))
-		} else if change.ChangeType == directory.Creation {
-			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.File.Filepath, directory.CREATED_CHANGE, change.File.ObjectName)))
+		if change.ChangeType == directories.Modification {
+			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.File.Filepath, directories.MODIFIED_CHANGE, change.File.ObjectName)))
+		} else if change.ChangeType == directories.Creation {
+			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.File.Filepath, directories.CREATED_CHANGE, change.File.ObjectName)))
 		} else {
-			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n", change.Removal.Filepath, directory.REMOVAL_CHANGE)))
+			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n", change.Removal.Filepath, directories.REMOVAL_CHANGE)))
 		}
 		errors.Check(err)
 	}
 }
 
-func (fileSystem *FileSystem) parseIndex(file *os.File) []*directory.Change {
-	var index []*directory.Change
+func (fileSystem *FileSystem) parseIndex(file *os.File) []*directories.Change {
+	var index []*directories.Change
 	scanner := bufio.NewScanner(file)
 
 	// Skip file header lines
@@ -114,7 +114,7 @@ func (fileSystem *FileSystem) parseIndex(file *os.File) []*directory.Change {
 	scanner.Scan()
 
 	for scanner.Scan() {
-		change := directory.Change{}
+		change := directories.Change{}
 
 		changeHeader := strings.Split(scanner.Text(), "\t")
 
@@ -122,20 +122,20 @@ func (fileSystem *FileSystem) parseIndex(file *os.File) []*directory.Change {
 			errors.Error("Invalid index format.")
 		}
 
-		if changeHeader[1] == directory.MODIFIED_CHANGE || changeHeader[1] == directory.CREATED_CHANGE {
-			if changeHeader[1] == directory.MODIFIED_CHANGE {
-				change.ChangeType = directory.Modification
+		if changeHeader[1] == directories.MODIFIED_CHANGE || changeHeader[1] == directories.CREATED_CHANGE {
+			if changeHeader[1] == directories.MODIFIED_CHANGE {
+				change.ChangeType = directories.Modification
 			} else {
-				change.ChangeType = directory.Creation
+				change.ChangeType = directories.Creation
 			}
 
-			change.File = &directory.File{}
+			change.File = &directories.File{}
 			change.File.Filepath = changeHeader[0]
 			scanner.Scan()
 			change.File.ObjectName = scanner.Text()
 		} else {
-			change.ChangeType = directory.Removal
-			change.Removal = &directory.FileRemoval{}
+			change.ChangeType = directories.Removal
+			change.Removal = &directories.FileRemoval{}
 			change.Removal.Filepath = changeHeader[0]
 		}
 
@@ -145,7 +145,7 @@ func (fileSystem *FileSystem) parseIndex(file *os.File) []*directory.Change {
 	return index
 }
 
-func (fileSystem *FileSystem) ReadIndex() []*directory.Change {
+func (fileSystem *FileSystem) ReadIndex() []*directories.Change {
 	file, err := os.OpenFile(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_RDONLY, 0644)
 	errors.Check(err)
 	defer file.Close()
@@ -220,9 +220,9 @@ func (fileSystem *FileSystem) ReadHead() string {
 	return fileSystem.parseHead(file)
 }
 
-func (fileSystem *FileSystem) ReadDir(saveName string) directory.Dir {
-	dir := directory.Dir{Path: fileSystem.Root, Children: make(map[string]*directory.Node)}
-	changes := []directory.Change{}
+func (fileSystem *FileSystem) ReadDir(saveName string) directories.Dir {
+	dir := directories.Dir{Path: fileSystem.Root, Children: make(map[string]*directories.Node)}
+	changes := []directories.Change{}
 
 	for saveName != "" {
 		file, err := os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
@@ -253,7 +253,7 @@ func (fileSystem *FileSystem) ReadDir(saveName string) directory.Dir {
 		scanner.Scan()
 
 		for scanner.Scan() {
-			change := directory.Change{}
+			change := directories.Change{}
 
 			changeHeader := strings.Split(scanner.Text(), "\t")
 
@@ -261,20 +261,20 @@ func (fileSystem *FileSystem) ReadDir(saveName string) directory.Dir {
 				errors.Error("Invalid save format.")
 			}
 
-			if changeHeader[1] == directory.MODIFIED_CHANGE || changeHeader[1] == directory.CREATED_CHANGE {
-				if changeHeader[1] == directory.MODIFIED_CHANGE {
-					change.ChangeType = directory.Modification
+			if changeHeader[1] == directories.MODIFIED_CHANGE || changeHeader[1] == directories.CREATED_CHANGE {
+				if changeHeader[1] == directories.MODIFIED_CHANGE {
+					change.ChangeType = directories.Modification
 				} else {
-					change.ChangeType = directory.Creation
+					change.ChangeType = directories.Creation
 				}
 
-				change.File = &directory.File{}
+				change.File = &directories.File{}
 				change.File.Filepath = changeHeader[0]
 				scanner.Scan()
 				change.File.ObjectName = scanner.Text()
 			} else {
-				change.ChangeType = directory.Removal
-				change.Removal = &directory.FileRemoval{}
+				change.ChangeType = directories.Removal
+				change.Removal = &directories.FileRemoval{}
 				change.Removal.Filepath = changeHeader[0]
 			}
 
@@ -296,7 +296,7 @@ func (fileSystem *FileSystem) ReadDir(saveName string) directory.Dir {
 	return dir
 }
 
-func (fileSystem *FileSystem) WriteObject(filepath string, file *os.File) *directory.File {
+func (fileSystem *FileSystem) WriteObject(filepath string, file *os.File) *directories.File {
 	var buffer bytes.Buffer
 	chunkBuffer := make([]byte, 1024)
 
@@ -329,7 +329,7 @@ func (fileSystem *FileSystem) WriteObject(filepath string, file *os.File) *direc
 	errors.Check(err)
 	compressor.Close()
 
-	return &directory.File{Filepath: filepath, ObjectName: objectName}
+	return &directories.File{Filepath: filepath, ObjectName: objectName}
 }
 
 func (fileSystem *FileSystem) RemoveObject(name string) {
@@ -353,12 +353,12 @@ func (fileSystem *FileSystem) WriteSave(save *Checkpoint) string {
 	errors.Check(err)
 
 	for _, change := range save.Changes {
-		if change.ChangeType == directory.Modification {
-			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.File.Filepath, directory.MODIFIED_CHANGE, change.File.ObjectName)))
-		} else if change.ChangeType == directory.Creation {
-			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.File.Filepath, directory.CREATED_CHANGE, change.File.ObjectName)))
+		if change.ChangeType == directories.Modification {
+			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.File.Filepath, directories.MODIFIED_CHANGE, change.File.ObjectName)))
+		} else if change.ChangeType == directories.Creation {
+			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.File.Filepath, directories.CREATED_CHANGE, change.File.ObjectName)))
 		} else {
-			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n", change.Removal.Filepath, directory.REMOVAL_CHANGE)))
+			_, err = stringBuilder.Write([]byte(fmt.Sprintf("%s\t%s\n", change.Removal.Filepath, directories.REMOVAL_CHANGE)))
 		}
 		errors.Check(err)
 	}
@@ -413,7 +413,7 @@ func (fileSystem *FileSystem) ParseCheckpoint(id string, file *os.File) *Checkpo
 	scanner.Scan()
 
 	for scanner.Scan() {
-		change := &directory.Change{}
+		change := &directories.Change{}
 
 		changeHeader := strings.Split(scanner.Text(), "\t")
 
@@ -421,20 +421,20 @@ func (fileSystem *FileSystem) ParseCheckpoint(id string, file *os.File) *Checkpo
 			errors.Error("Invalid save format.")
 		}
 
-		if changeHeader[1] == directory.MODIFIED_CHANGE || changeHeader[1] == directory.CREATED_CHANGE {
-			if changeHeader[1] == directory.MODIFIED_CHANGE {
-				change.ChangeType = directory.Modification
+		if changeHeader[1] == directories.MODIFIED_CHANGE || changeHeader[1] == directories.CREATED_CHANGE {
+			if changeHeader[1] == directories.MODIFIED_CHANGE {
+				change.ChangeType = directories.Modification
 			} else {
-				change.ChangeType = directory.Creation
+				change.ChangeType = directories.Creation
 			}
 
-			change.File = &directory.File{}
+			change.File = &directories.File{}
 			change.File.Filepath = changeHeader[0]
 			scanner.Scan()
 			change.File.ObjectName = scanner.Text()
 		} else {
-			change.ChangeType = directory.Removal
-			change.Removal = &directory.FileRemoval{}
+			change.ChangeType = directories.Removal
+			change.Removal = &directories.FileRemoval{}
 			change.Removal.Filepath = changeHeader[0]
 		}
 
@@ -472,7 +472,7 @@ func (fileSystem *FileSystem) ReadSave(checkpointId string) *Save {
 	return save
 }
 
-func (fileSystem *FileSystem) createFile(file *directory.File) {
+func (fileSystem *FileSystem) createFile(file *directories.File) {
 	sourceFile, err := os.OpenFile(file.Filepath, os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -508,8 +508,8 @@ func (fileSystem *FileSystem) createFile(file *directory.File) {
 	}
 }
 
-func (fileSystem *FileSystem) CreateNode(node *directory.Node) {
-	if node.NodeType == directory.FileType {
+func (fileSystem *FileSystem) CreateNode(node *directories.Node) {
+	if node.NodeType == directories.FileType {
 		fileSystem.createFile(node.File)
 		return
 	}
@@ -521,7 +521,7 @@ func (fileSystem *FileSystem) CreateNode(node *directory.Node) {
 // Safely remove a directory
 //
 // This helper prevents the .repository dir to be removed
-func (fileSystem *FileSystem) SafeRemoveWorkingDir(dir *directory.Dir) {
+func (fileSystem *FileSystem) SafeRemoveWorkingDir(dir *directories.Dir) {
 	if dir.Path != fileSystem.Root {
 		err := os.RemoveAll(dir.Path)
 		errors.Check(err)

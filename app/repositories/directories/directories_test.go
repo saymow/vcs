@@ -1,4 +1,4 @@
-package directory
+package directories
 
 import (
 	"fmt"
@@ -465,8 +465,18 @@ func TestPreOrderTraversal(t *testing.T) {
 	)
 }
 
+func getOsRoot() string {
+	if runtime.GOOS == "windows" {
+		return "C:\\"
+	}
+
+	return "/"
+}
+
 func TestNormalizePath(t *testing.T) {
-	base := Path.Join("home", "project")
+	base, err := os.Getwd()
+	errors.Check(err)
+
 	dir := &Dir{
 		Path:     base,
 		Children: make(map[string]*Node),
@@ -496,25 +506,17 @@ func TestNormalizePath(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, filepath, "")
 
-	filepath, err = dir.NormalizePath(Path.Join("a", "b"))
+	filepath, err = dir.NormalizePath(Path.Join(getOsRoot(), "a", "b"))
 	assert.Error(t, err, "invalid path.")
 	assert.Equal(t, filepath, "")
 
-	filepath, err = dir.NormalizePath(Path.Join("home", "a"))
+	filepath, err = dir.NormalizePath(Path.Join(getOsRoot(), "home", "a"))
 	assert.Error(t, err, "invalid path.")
 	assert.Equal(t, filepath, "")
 
-	filepath, err = dir.NormalizePath(Path.Join("home", "projectads", "a"))
+	filepath, err = dir.NormalizePath(Path.Join(getOsRoot(), "home", "projectads", "a"))
 	assert.Error(t, err, "invalid path.")
 	assert.Equal(t, filepath, "")
-}
-
-func getOsRoot() string {
-	if runtime.GOOS == "windows" {
-		return "C:\\"
-	}
-
-	return "/"
 }
 
 func TestAbsPath(t *testing.T) {
