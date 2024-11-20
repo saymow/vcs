@@ -31,6 +31,9 @@ var CLI struct {
 	Ref struct {
 		Name string `arg:"" name:"name" help:"Reference name."`
 	} `cmd:"" help:"Create a reference in the current Save point."`
+	Load struct {
+		Name string `arg:"" name:"name" help:"Reference name or Save hash."`
+	} `cmd:"" help:"Load the file tree of a Ref name or Save hash."`
 }
 
 func Start() {
@@ -55,6 +58,8 @@ func Start() {
 		handlers.Restore(CLI.Restore.Path, CLI.Restore.Ref)
 	case "ref <name>":
 		handlers.CreateRef(ctx.Args[1])
+	case "load <name>":
+		handlers.Load(ctx.Args[1])
 	default:
 		panic(ctx.Command())
 	}
