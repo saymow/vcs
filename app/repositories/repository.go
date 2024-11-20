@@ -29,7 +29,8 @@ type Repository struct {
 	dir   directory.Dir
 }
 
-type Log struct {
+type SaveLog struct {
+	Refs       []string
 	Checkpoint *filesystem.Checkpoint
 }
 
@@ -527,19 +528,27 @@ func (repository *Repository) Restore(ref string, path string) *ValidationError 
 	return nil
 }
 
-func (repository *Repository) GetLogs() []*Log {
+func (repository *Repository) GetLogs() []*SaveLog {
 	save := repository.getSave(repository.head)
 
 	if save == nil {
-		return []*Log{}
+		return []*SaveLog{}
 	}
+
+	savesToRefsMap := collections.InvertMap(*repository.refs)
 
 	// By default the save checkpoints is ordered by createdAt in ascending order.
 	// The other way around is better for logging.
 	slices.Reverse(save.Checkpoints)
 
-	return collections.Map(save.Checkpoints, func(checkpoint *filesystem.Checkpoint, _ int) *Log {
-		return &Log{Checkpoint: checkpoint}
+	return collections.Map(save.Checkpoints, func(checkpoint *filesystem.Checkpoint, _ int) *SaveLog {
+		var refs []string
+
+		if mapSaves, ok := savesToRefsMap[checkpoint.Id]; ok {
+			refs = mapSaves
+		}
+
+		return &SaveLog{Checkpoint: checkpoint, Refs: refs}
 	})
 }
 
