@@ -53,7 +53,11 @@ type Status struct {
 }
 
 type ValidationError struct {
-	message string
+	Message string
+}
+
+func (err *ValidationError) Error() string {
+	return fmt.Sprintf("Validation Error: %s", err.Message)
 }
 
 func CreateRepository(root string) *Repository {
@@ -78,10 +82,6 @@ func GetRepository(root string) *Repository {
 	repository.dir = repository.fs.ReadDir(repository.getCurrentSaveName())
 
 	return repository
-}
-
-func (err *ValidationError) Error() string {
-	return fmt.Sprintf("Validation Error: %s", err.message)
 }
 
 func (repository *Repository) getCurrentSaveName() string {
@@ -407,7 +407,7 @@ func buildDirFromSave(root string, save *filesystem.Save) *directory.Dir {
 	return dir
 }
 
-func (repository *Repository) resolvePath(path string) (string, *ValidationError) {
+func (repository *Repository) resolvePath(path string) (string, error) {
 	normalizedPath, err := repository.dir.NormalizePath(path)
 
 	if err != nil {
@@ -435,7 +435,7 @@ func (repository *Repository) resolvePath(path string) (string, *ValidationError
 //     restore the Save or HEAD + index.
 //   - You can use Restore to recover a deleted file from the index or from a Save.
 //   - The HEAD is not changed during Restore.
-func (repository *Repository) Restore(ref string, path string) *ValidationError {
+func (repository *Repository) Restore(ref string, path string) error {
 	resolvedPath, err := repository.resolvePath(path)
 	if err != nil {
 		return err
@@ -569,7 +569,7 @@ func (repository *Repository) GetRefs() filesystem.Refs {
 	return *repository.refs
 }
 
-func (repository *Repository) CreateRef(name string) *ValidationError {
+func (repository *Repository) CreateRef(name string) error {
 	currentSaveName := repository.getCurrentSaveName()
 
 	if currentSaveName == "" {
