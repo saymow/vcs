@@ -1403,7 +1403,11 @@ func TestGetLogs(t *testing.T) {
 
 	// History empty
 
-	testifyAssert.EqualValues(t, repository.GetLogs(), []*SaveLog{})
+	testifyAssert.EqualValues(
+		t,
+		repository.GetLogs(),
+		&Log{Head: filesystem.INITAL_REF_NAME, History: []*SaveLog{}},
+	)
 
 	// After Save 0
 
@@ -1413,17 +1417,18 @@ func TestGetLogs(t *testing.T) {
 	repository.SaveIndex()
 	save0, _ := repository.CreateSave("save0")
 
-	logs := repository.GetLogs()
-	testifyAssert.Equal(t, len(logs), 1)
-	testifyAssert.Equal(t, len(logs[0].Refs), 1)
-	testifyAssert.Equal(t, logs[0].Refs[0], filesystem.INITAL_REF_NAME)
-	testifyAssert.Equal(t, logs[0].Checkpoint.Id, save0.Id)
-	testifyAssert.Equal(t, logs[0].Checkpoint.Message, save0.Message)
-	testifyAssert.Equal(t, logs[0].Checkpoint.Parent, save0.Parent)
+	log := repository.GetLogs()
+	testifyAssert.Equal(t, log.Head, filesystem.INITAL_REF_NAME)
+	testifyAssert.Equal(t, len(log.History), 1)
+	testifyAssert.Equal(t, len(log.History[0].Refs), 1)
+	testifyAssert.Equal(t, log.History[0].Refs[0], filesystem.INITAL_REF_NAME)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.Id, save0.Id)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.Message, save0.Message)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.Parent, save0.Parent)
 	// When saving the time in the file, using the Layout format, we lose the ms precision.
 	// Therefore this is needed to compare times
-	testifyAssert.Equal(t, logs[0].Checkpoint.CreatedAt.Format(time.Layout), save0.CreatedAt.Format(time.Layout))
-	testifyAssert.EqualValues(t, logs[0].Checkpoint.Changes, save0.Changes)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.CreatedAt.Format(time.Layout), save0.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, log.History[0].Checkpoint.Changes, save0.Changes)
 
 	// Create Ref
 
@@ -1439,27 +1444,28 @@ func TestGetLogs(t *testing.T) {
 	repository.SaveIndex()
 	save1, _ := repository.CreateSave("save1")
 
-	logs = repository.GetLogs()
-	testifyAssert.Equal(t, len(logs), 2)
-	testifyAssert.Equal(t, len(logs[0].Refs), 1)
-	testifyAssert.Equal(t, logs[0].Refs[0], "a")
-	testifyAssert.Equal(t, logs[0].Checkpoint.Id, save1.Id)
-	testifyAssert.Equal(t, logs[0].Checkpoint.Message, save1.Message)
-	testifyAssert.Equal(t, logs[0].Checkpoint.Parent, save1.Parent)
+	log = repository.GetLogs()
+	testifyAssert.Equal(t, log.Head, "a")
+	testifyAssert.Equal(t, len(log.History), 2)
+	testifyAssert.Equal(t, len(log.History[0].Refs), 1)
+	testifyAssert.Equal(t, log.History[0].Refs[0], "a")
+	testifyAssert.Equal(t, log.History[0].Checkpoint.Id, save1.Id)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.Message, save1.Message)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.Parent, save1.Parent)
 	// When saving the time in the file, using the Layout format, we lose the ms precision.
 	// Therefore this is needed to compare times
-	testifyAssert.Equal(t, logs[0].Checkpoint.CreatedAt.Format(time.Layout), save1.CreatedAt.Format(time.Layout))
-	testifyAssert.EqualValues(t, logs[0].Checkpoint.Changes, save1.Changes)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.CreatedAt.Format(time.Layout), save1.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, log.History[0].Checkpoint.Changes, save1.Changes)
 
-	testifyAssert.Equal(t, len(logs[1].Refs), 1)
-	testifyAssert.Equal(t, logs[1].Refs[0], filesystem.INITAL_REF_NAME)
-	testifyAssert.Equal(t, logs[1].Checkpoint.Id, save0.Id)
-	testifyAssert.Equal(t, logs[1].Checkpoint.Message, save0.Message)
-	testifyAssert.Equal(t, logs[1].Checkpoint.Parent, save0.Parent)
+	testifyAssert.Equal(t, len(log.History[1].Refs), 1)
+	testifyAssert.Equal(t, log.History[1].Refs[0], filesystem.INITAL_REF_NAME)
+	testifyAssert.Equal(t, log.History[1].Checkpoint.Id, save0.Id)
+	testifyAssert.Equal(t, log.History[1].Checkpoint.Message, save0.Message)
+	testifyAssert.Equal(t, log.History[1].Checkpoint.Parent, save0.Parent)
 	// When saving the time in the file, using the Layout format, we lose the ms precision.
 	// Therefore this is needed to compare times
-	testifyAssert.Equal(t, logs[1].Checkpoint.CreatedAt.Format(time.Layout), save0.CreatedAt.Format(time.Layout))
-	testifyAssert.EqualValues(t, logs[1].Checkpoint.Changes, save0.Changes)
+	testifyAssert.Equal(t, log.History[1].Checkpoint.CreatedAt.Format(time.Layout), save0.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, log.History[1].Checkpoint.Changes, save0.Changes)
 
 	// After Save 2
 
@@ -1476,35 +1482,36 @@ func TestGetLogs(t *testing.T) {
 	repository.CreateRef("b")
 	repository.CreateRef("c")
 
-	logs = repository.GetLogs()
-	testifyAssert.Equal(t, len(logs), 3)
-	testifyAssert.Equal(t, len(logs[0].Refs), 3)
-	testifyAssert.Equal(t, logs[0].Checkpoint.Id, save2.Id)
-	testifyAssert.Equal(t, logs[0].Checkpoint.Message, save2.Message)
-	testifyAssert.Equal(t, logs[0].Checkpoint.Parent, save2.Parent)
+	log = repository.GetLogs()
+	testifyAssert.Equal(t, log.Head, "c")
+	testifyAssert.Equal(t, len(log.History), 3)
+	testifyAssert.Equal(t, len(log.History[0].Refs), 3)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.Id, save2.Id)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.Message, save2.Message)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.Parent, save2.Parent)
 	// When saving the time in the file, using the Layout format, we lose the ms precision.
 	// Therefore this is needed to compare times
-	testifyAssert.Equal(t, logs[0].Checkpoint.CreatedAt.Format(time.Layout), save2.CreatedAt.Format(time.Layout))
-	testifyAssert.EqualValues(t, logs[0].Checkpoint.Changes, save2.Changes)
+	testifyAssert.Equal(t, log.History[0].Checkpoint.CreatedAt.Format(time.Layout), save2.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, log.History[0].Checkpoint.Changes, save2.Changes)
 
-	testifyAssert.Equal(t, len(logs[1].Refs), 0)
-	testifyAssert.Equal(t, logs[1].Checkpoint.Id, save1.Id)
-	testifyAssert.Equal(t, logs[1].Checkpoint.Message, save1.Message)
-	testifyAssert.Equal(t, logs[1].Checkpoint.Parent, save1.Parent)
+	testifyAssert.Equal(t, len(log.History[1].Refs), 0)
+	testifyAssert.Equal(t, log.History[1].Checkpoint.Id, save1.Id)
+	testifyAssert.Equal(t, log.History[1].Checkpoint.Message, save1.Message)
+	testifyAssert.Equal(t, log.History[1].Checkpoint.Parent, save1.Parent)
 	// When saving the time in the file, using the Layout format, we lose the ms precision.
 	// Therefore this is needed to compare times
-	testifyAssert.Equal(t, logs[1].Checkpoint.CreatedAt.Format(time.Layout), save1.CreatedAt.Format(time.Layout))
-	testifyAssert.EqualValues(t, logs[1].Checkpoint.Changes, save1.Changes)
+	testifyAssert.Equal(t, log.History[1].Checkpoint.CreatedAt.Format(time.Layout), save1.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, log.History[1].Checkpoint.Changes, save1.Changes)
 
-	testifyAssert.Equal(t, len(logs[2].Refs), 1)
-	testifyAssert.Equal(t, logs[2].Refs[0], filesystem.INITAL_REF_NAME)
-	testifyAssert.Equal(t, logs[2].Checkpoint.Id, save0.Id)
-	testifyAssert.Equal(t, logs[2].Checkpoint.Message, save0.Message)
-	testifyAssert.Equal(t, logs[2].Checkpoint.Parent, save0.Parent)
+	testifyAssert.Equal(t, len(log.History[2].Refs), 1)
+	testifyAssert.Equal(t, log.History[2].Refs[0], filesystem.INITAL_REF_NAME)
+	testifyAssert.Equal(t, log.History[2].Checkpoint.Id, save0.Id)
+	testifyAssert.Equal(t, log.History[2].Checkpoint.Message, save0.Message)
+	testifyAssert.Equal(t, log.History[2].Checkpoint.Parent, save0.Parent)
 	// When saving the time in the file, using the Layout format, we lose the ms precision.
 	// Therefore this is needed to compare times
-	testifyAssert.Equal(t, logs[2].Checkpoint.CreatedAt.Format(time.Layout), save0.CreatedAt.Format(time.Layout))
-	testifyAssert.EqualValues(t, logs[2].Checkpoint.Changes, save0.Changes)
+	testifyAssert.Equal(t, log.History[2].Checkpoint.CreatedAt.Format(time.Layout), save0.CreatedAt.Format(time.Layout))
+	testifyAssert.EqualValues(t, log.History[2].Checkpoint.Changes, save0.Changes)
 }
 
 func TestRefs(t *testing.T) {
