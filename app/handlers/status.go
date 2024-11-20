@@ -7,7 +7,7 @@ import (
 	"saymow/version-manager/app/repositories"
 )
 
-func Status() {
+func ShowStatus() {
 	dir, err := os.Getwd()
 	errors.Check(err)
 

@@ -10,7 +10,7 @@ import (
 // Wed, Nov 18, 2024, 2:35 PM
 const DATE_LAYOUT = "Mon, Jan 06, 2006, 3:04 PM"
 
-func Logs() {
+func ShowLogs() {
 	root, err := os.Getwd()
 	errors.Check(err)
 

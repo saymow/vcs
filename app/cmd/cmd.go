@@ -27,6 +27,9 @@ var CLI struct {
 	} `cmd:"" help:"Show the repository saves logs."`
 	Refs struct {
 	} `cmd:"" help:"Show the repository saves refs."`
+	Ref struct {
+		Name string `arg:"" name:"name" help:"Reference name."`
+	} `cmd:"" help:"Create a reference in the current Save point."`
 }
 
 func Start() {
@@ -36,11 +39,11 @@ func Start() {
 	case "init":
 		handlers.Init()
 	case "status":
-		handlers.Status()
+		handlers.ShowStatus()
 	case "logs":
-		handlers.Logs()
+		handlers.ShowLogs()
 	case "refs":
-		handlers.Refs()
+		handlers.ShowRefs()
 	case "add <path>":
 		handlers.TrackFiles(ctx.Args[1:])
 	case "rm <path>":
@@ -49,6 +52,8 @@ func Start() {
 		handlers.Save(ctx.Args[1])
 	case "restore <path>":
 		handlers.Restore(ctx.Args[1])
+	case "ref <name>":
+		handlers.CreateRef(ctx.Args[1])
 	default:
 		panic(ctx.Command())
 	}
