@@ -34,6 +34,11 @@ type SaveLog struct {
 	Checkpoint *filesystem.Checkpoint
 }
 
+type Log struct {
+	Head    string
+	History []*SaveLog
+}
+
 type Status struct {
 	Staged struct {
 		CreatedFilesPaths []string
@@ -528,11 +533,16 @@ func (repository *Repository) Restore(ref string, path string) *ValidationError 
 	return nil
 }
 
-func (repository *Repository) GetLogs() []*SaveLog {
+func (repository *Repository) GetLogs() *Log {
 	save := repository.getSave(repository.head)
 
 	if save == nil {
-		return []*SaveLog{}
+		// repostory without saves history
+
+		return &Log{
+			Head:    repository.head,
+			History: []*SaveLog{},
+		}
 	}
 
 	savesToRefsMap := collections.InvertMap(*repository.refs)
@@ -541,15 +551,18 @@ func (repository *Repository) GetLogs() []*SaveLog {
 	// The other way around is better for logging.
 	slices.Reverse(save.Checkpoints)
 
-	return collections.Map(save.Checkpoints, func(checkpoint *filesystem.Checkpoint, _ int) *SaveLog {
-		var refs []string
+	return &Log{
+		Head: repository.head,
+		History: collections.Map(save.Checkpoints, func(checkpoint *filesystem.Checkpoint, _ int) *SaveLog {
+			var refs []string
 
-		if mapSaves, ok := savesToRefsMap[checkpoint.Id]; ok {
-			refs = mapSaves
-		}
+			if mapSaves, ok := savesToRefsMap[checkpoint.Id]; ok {
+				refs = mapSaves
+			}
 
-		return &SaveLog{Checkpoint: checkpoint, Refs: refs}
-	})
+			return &SaveLog{Checkpoint: checkpoint, Refs: refs}
+		}),
+	}
 }
 
 func (repository *Repository) GetRefs() filesystem.Refs {
