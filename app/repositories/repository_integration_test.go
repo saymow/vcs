@@ -35,8 +35,8 @@ func TestInitRepository(t *testing.T) {
 				t,
 				fs.WithDir(
 					filesystem.REPOSITORY_FOLDER_NAME,
-					fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystem.INITAL_BRANCH_NAME)),
-					fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_BRANCH_NAME),
+					fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystem.INITAL_REF_NAME)),
+					fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_REF_NAME),
 					fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
 					fs.WithDir(filesystem.SAVES_FOLDER_NAME),
 					fs.WithDir(filesystem.OBJECTS_FOLDER_NAME),
@@ -59,7 +59,7 @@ func TestGetRepository(t *testing.T) {
 	repository := GetRepository(dir.Path())
 
 	assert.Equal(t, repository.fs.Root, dir.Path())
-	assert.Equal(t, repository.head, filesystem.INITAL_BRANCH_NAME)
+	assert.Equal(t, repository.head, filesystem.INITAL_REF_NAME)
 	testifyAssert.EqualValues(
 		t,
 		repository.index,
@@ -111,8 +111,8 @@ func TestIndexFile(t *testing.T) {
 				dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
 				fs.Expected(
 					t,
-					fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystem.INITAL_BRANCH_NAME)),
-					fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_BRANCH_NAME),
+					fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystem.INITAL_REF_NAME)),
+					fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_REF_NAME),
 					fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
 					fs.WithDir(filesystem.SAVES_FOLDER_NAME),
 					fs.WithDir(
@@ -148,8 +148,8 @@ func TestIndexFile(t *testing.T) {
 					dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
 					fs.Expected(
 						t,
-						fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystem.INITAL_BRANCH_NAME)),
-						fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_BRANCH_NAME),
+						fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystem.INITAL_REF_NAME)),
+						fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_REF_NAME),
 						fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
 						fs.WithDir(filesystem.SAVES_FOLDER_NAME),
 						fs.WithDir(
@@ -201,8 +201,8 @@ func TestIndexFile(t *testing.T) {
 				dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
 				fs.Expected(
 					t,
-					fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystem.INITAL_BRANCH_NAME)),
-					fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_BRANCH_NAME),
+					fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystem.INITAL_REF_NAME)),
+					fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_REF_NAME),
 					fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
 					fs.WithDir(filesystem.SAVES_FOLDER_NAME),
 					fs.WithDir(
@@ -563,8 +563,8 @@ Files:
 			dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
 			fs.Expected(
 				t,
-				fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n%s\n", filesystem.INITAL_BRANCH_NAME, firstSave.Id)),
-				fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_BRANCH_NAME),
+				fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n%s\n", filesystem.INITAL_REF_NAME, firstSave.Id)),
+				fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_REF_NAME),
 				fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\n\n"),
 				fs.WithDir(filesystem.SAVES_FOLDER_NAME,
 					fs.WithFile(firstSave.Id, expectedFirstSaveFileContent),
@@ -642,8 +642,8 @@ Files:
 			dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
 			fs.Expected(
 				t,
-				fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n%s\n", filesystem.INITAL_BRANCH_NAME, secondSave.Id)),
-				fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_BRANCH_NAME),
+				fs.WithFile(filesystem.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n%s\n", filesystem.INITAL_REF_NAME, secondSave.Id)),
+				fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_REF_NAME),
 				fs.WithFile(filesystem.INDEX_FILE_NAME, "Tracked files:\n\n"),
 				fs.WithDir(filesystem.SAVES_FOLDER_NAME,
 					fs.WithFile(firstSave.Id, expectedFirstSaveFileContent),
@@ -801,7 +801,7 @@ func TestRestoreHeadDir(t *testing.T) {
 
 		// Test
 		{
-			assert.Equal(t, repository.head, filesystem.INITAL_BRANCH_NAME)
+			assert.Equal(t, repository.head, filesystem.INITAL_REF_NAME)
 			assert.Assert(
 				t,
 				fs.Equal(
@@ -851,7 +851,7 @@ func TestRestoreHeadDir(t *testing.T) {
 
 		// Test
 		{
-			assert.Equal(t, repository.head, filesystem.INITAL_BRANCH_NAME)
+			assert.Equal(t, repository.head, filesystem.INITAL_REF_NAME)
 			assert.Equal(t, len(repository.index), 0)
 			assert.Assert(
 				t,
@@ -949,7 +949,7 @@ func TestRestoreHistoryUnsavedChanges(t *testing.T) {
 
 			repository = GetRepository(dir.Path())
 
-			assert.Equal(t, repository.head, filesystem.INITAL_BRANCH_NAME)
+			assert.Equal(t, repository.head, filesystem.INITAL_REF_NAME)
 			assert.Equal(t, len(repository.index), 0)
 			assert.Assert(
 				t,
@@ -1066,7 +1066,7 @@ func TestRestoreHistoryUnsavedChanges(t *testing.T) {
 
 			repository = GetRepository(dir.Path())
 
-			assert.Equal(t, repository.head, filesystem.INITAL_BRANCH_NAME)
+			assert.Equal(t, repository.head, filesystem.INITAL_REF_NAME)
 			assert.Equal(t, len(repository.index), 3)
 			testifyAssert.EqualValues(
 				t,
@@ -1298,7 +1298,7 @@ func TestRestoreHistory(t *testing.T) {
 		repository = GetRepository(dir.Path())
 		repository.Restore(save3.Id, ".")
 
-		assert.Equal(t, repository.head, filesystem.INITAL_BRANCH_NAME)
+		assert.Equal(t, repository.head, filesystem.INITAL_REF_NAME)
 		assert.Assert(
 			t,
 			fs.Equal(
@@ -1344,7 +1344,7 @@ func TestRestoreHistory(t *testing.T) {
 		repository = GetRepository(dir.Path())
 		repository.Restore(save0.Id, ".")
 
-		assert.Equal(t, repository.head, filesystem.INITAL_BRANCH_NAME)
+		assert.Equal(t, repository.head, filesystem.INITAL_REF_NAME)
 		assert.Assert(
 			t,
 			fs.Equal(
@@ -1374,7 +1374,7 @@ func TestRestoreHistory(t *testing.T) {
 		repository = GetRepository(dir.Path())
 		repository.Restore(save5.Id, ".")
 
-		assert.Equal(t, repository.head, filesystem.INITAL_BRANCH_NAME)
+		assert.Equal(t, repository.head, filesystem.INITAL_REF_NAME)
 		assert.Assert(
 			t,
 			fs.Equal(
@@ -1486,4 +1486,120 @@ func TestGetLogs(t *testing.T) {
 	// Therefore this is needed to compare times
 	testifyAssert.Equal(t, logs[2].Checkpoint.CreatedAt.Format(time.Layout), save0.CreatedAt.Format(time.Layout))
 	testifyAssert.EqualValues(t, logs[2].Checkpoint.Changes, save0.Changes)
+}
+
+func TestRefs(t *testing.T) {
+	dir, repository := fixtureGetCustomProject(t, fixtureMakeBasicRepositoryFs)
+	defer dir.Remove()
+
+	// Multiples refs to the same save
+	{
+		// Setup
+		repository.CreateRef("feat/a")
+		repository.CreateRef("feat/b")
+
+		// Test
+		repository = GetRepository(dir.Path())
+		assert.Assert(
+			t,
+			fs.Equal(
+				dir.Join(filesystem.REPOSITORY_FOLDER_NAME),
+				fs.Expected(
+					t,
+					fs.WithFile(filesystem.HEAD_FILE_NAME, filesystem.INITAL_REF_NAME),
+					fs.MatchExtraFiles,
+				),
+			),
+		)
+		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
+			"master": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
+			"feat/a": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
+			"feat/b": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
+		})
+	}
+
+	// Save (move current save as a side effect) and create refs
+	{
+		// Setup
+		repository = GetRepository(dir.Path())
+
+		fixtures.WriteFile(dir.Join("new.txt"), []byte("it does not matter."))
+
+		repository.IndexFile("new.txt")
+		repository.SaveIndex()
+		save0, _ := repository.CreateSave("save message")
+
+		// Test
+		repository.CreateRef("feat/c")
+
+		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
+			"master": save0.Id,
+			"feat/a": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
+			"feat/b": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
+			"feat/c": save0.Id,
+		})
+
+		// Setup
+		repository = GetRepository(dir.Path())
+
+		fixtures.WriteFile(dir.Join("new.txt"), []byte("it does not matter 2.0."))
+
+		repository.IndexFile("new.txt")
+		repository.SaveIndex()
+		lastSave, _ := repository.CreateSave("save message")
+
+		// Test
+		repository.CreateRef("feat/d")
+
+		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
+			"master": lastSave.Id,
+			"feat/a": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
+			"feat/b": "3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2",
+			"feat/c": save0.Id,
+			"feat/d": lastSave.Id,
+		})
+	}
+}
+
+func TestInvalidRef(t *testing.T) {
+	dir, repository := fixtureGetBaseProject(t)
+	defer dir.Remove()
+
+	// Cannot create refs when there is no save history
+	{
+		testifyAssert.Error(t, repository.CreateRef("feat/a"), "cannot create refs when there is no save history.")
+		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
+			"master": "",
+		})
+	}
+
+	// Name already in use
+	{
+
+		fixtures.WriteFile(dir.Join("new.txt"), []byte("it does not matter."))
+
+		repository.IndexFile("new.txt")
+		repository.SaveIndex()
+		save0, _ := repository.CreateSave("save message")
+
+		repository = GetRepository(dir.Path())
+
+		repository.CreateRef("feat/a")
+		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
+			"master": save0.Id,
+			"feat/a": save0.Id,
+		})
+
+		fixtures.WriteFile(dir.Join("new.txt"), []byte("it does not matter even more."))
+
+		repository.IndexFile("new.txt")
+		repository.SaveIndex()
+		save1, _ := repository.CreateSave("save message")
+
+		testifyAssert.Error(t, repository.CreateRef("feat/a"), "name already in use.")
+		testifyAssert.EqualValues(t, repository.GetRefs(), map[string]string{
+			"master": save1.Id,
+			"feat/a": save0.Id,
+		})
+	}
 }
