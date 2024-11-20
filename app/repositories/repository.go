@@ -55,8 +55,8 @@ func CreateRepository(root string) *Repository {
 
 	return &Repository{
 		fs:    fileSystem,
-		refs:  &filesystem.Refs{filesystem.INITAL_BRANCH_NAME: ""},
-		head:  filesystem.INITAL_BRANCH_NAME,
+		refs:  &filesystem.Refs{filesystem.INITAL_REF_NAME: ""},
+		head:  filesystem.INITAL_REF_NAME,
 		index: []*directory.Change{},
 		dir:   directory.Dir{Path: root, Children: make(map[string]*directory.Node)},
 	}
@@ -364,7 +364,7 @@ func (repository *Repository) getSave(ref string) *filesystem.Save {
 	if ref == "" {
 		return nil
 	}
-	if ref == filesystem.INITAL_BRANCH_NAME {
+	if ref == filesystem.INITAL_REF_NAME {
 		if saveName, ok := (*repository.refs)[ref]; ok && saveName == "" {
 			// This is expect to only happen for repositories with not saves
 
@@ -541,4 +541,22 @@ func (repository *Repository) GetLogs() []*Log {
 	return collections.Map(save.Checkpoints, func(checkpoint *filesystem.Checkpoint, _ int) *Log {
 		return &Log{Checkpoint: checkpoint}
 	})
+}
+
+func (repository *Repository) GetRefs() filesystem.Refs {
+	return *repository.refs
+}
+
+func (repository *Repository) CreateRef(name string) *ValidationError {
+	currentSaveName := repository.getCurrentSaveName()
+
+	if currentSaveName == "" {
+		return &ValidationError{"cannot create refs when there is no save history."}
+	}
+	if saveName, found := (*repository.refs)[name]; found && saveName != currentSaveName {
+		return &ValidationError{"name already in use."}
+	}
+
+	repository.setRef(name, repository.getCurrentSaveName())
+	return nil
 }

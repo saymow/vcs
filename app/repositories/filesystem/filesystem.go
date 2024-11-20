@@ -26,7 +26,7 @@ const (
 	HEAD_FILE_NAME         = "head"
 	REFS_FILE_NAME         = "refs"
 
-	INITAL_BRANCH_NAME = "master"
+	INITAL_REF_NAME = "master"
 )
 
 type Save struct {
@@ -63,14 +63,14 @@ func Create(root string) *FileSystem {
 	errors.Check(err)
 	defer refsFile.Close()
 
-	_, err = refsFile.Write([]byte(fmt.Sprintf("Refs:\n\n%s\n\n", INITAL_BRANCH_NAME)))
+	_, err = refsFile.Write([]byte(fmt.Sprintf("Refs:\n\n%s\n\n", INITAL_REF_NAME)))
 	errors.Check(err)
 
 	headFile, err := os.Create(path.Join(root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME))
 	errors.Check(err)
 	defer headFile.Close()
 
-	_, err = headFile.Write([]byte(INITAL_BRANCH_NAME))
+	_, err = headFile.Write([]byte(INITAL_REF_NAME))
 	errors.Check(err)
 
 	err = os.Mkdir(path.Join(root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME), 0644)
