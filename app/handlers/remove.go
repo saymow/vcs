@@ -13,8 +13,8 @@ func Remove(paths []string) {
 	repository := repositories.GetRepository(dir)
 
 	for _, path := range paths {
-		repository.RemoveFile(path)
+		checkError(repository.RemoveFile(path))
 	}
 
-	repository.SaveIndex()
+	checkError(repository.SaveIndex())
 }

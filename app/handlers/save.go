@@ -11,5 +11,6 @@ func Save(message string) {
 	errors.Check(err)
 
 	repository := repositories.GetRepository(dir)
-	repository.CreateSave(message)
+	_, err = repository.CreateSave(message)
+	checkError(err)
 }

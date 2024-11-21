@@ -13,8 +13,8 @@ func Add(paths []string) {
 	repository := repositories.GetRepository(dir)
 
 	for _, path := range paths {
-		repository.IndexFile(path)
+		checkError(repository.IndexFile(path))
 	}
 
-	repository.SaveIndex()
+	checkError(repository.SaveIndex())
 }
