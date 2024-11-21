@@ -53,8 +53,8 @@ func CreateRepository(root string) *Repository {
 
 	return &Repository{
 		fs:    fileSystem,
-		refs:  &filesystems.Refs{filesystems.INITAL_REF_NAME: ""},
-		head:  filesystems.INITAL_REF_NAME,
+		refs:  &filesystems.Refs{filesystems.INITIAL_REF_NAME: ""},
+		head:  filesystems.INITIAL_REF_NAME,
 		index: []*directories.Change{},
 		dir:   directories.Dir{Path: root, Children: make(map[string]*directories.Node)},
 	}
@@ -137,7 +137,7 @@ func (repository *Repository) getSave(ref string) *filesystems.Save {
 	if ref == "" {
 		return nil
 	}
-	if ref == filesystems.INITAL_REF_NAME {
+	if ref == filesystems.INITIAL_REF_NAME {
 		if saveName, ok := (*repository.refs)[ref]; ok && saveName == "" {
 			// This is expect to only happen for repositories with not saves
 

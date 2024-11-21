@@ -124,7 +124,7 @@ func TestRestoreHeadDir(t *testing.T) {
 
 		// Test
 		{
-			fsAssert.Equal(t, repository.head, filesystems.INITAL_REF_NAME)
+			fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
 			fsAssert.Assert(
 				t,
 				fs.Equal(
@@ -174,7 +174,7 @@ func TestRestoreHeadDir(t *testing.T) {
 
 		// Test
 		{
-			fsAssert.Equal(t, repository.head, filesystems.INITAL_REF_NAME)
+			fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
 			fsAssert.Equal(t, len(repository.index), 0)
 			fsAssert.Assert(
 				t,
@@ -272,7 +272,7 @@ func TestRestoreHistoryUnsavedChanges(t *testing.T) {
 
 			repository = GetRepository(dir.Path())
 
-			fsAssert.Equal(t, repository.head, filesystems.INITAL_REF_NAME)
+			fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
 			fsAssert.Equal(t, len(repository.index), 0)
 			fsAssert.Assert(
 				t,
@@ -389,7 +389,7 @@ func TestRestoreHistoryUnsavedChanges(t *testing.T) {
 
 			repository = GetRepository(dir.Path())
 
-			fsAssert.Equal(t, repository.head, filesystems.INITAL_REF_NAME)
+			fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
 			fsAssert.Equal(t, len(repository.index), 3)
 			assert.EqualValues(
 				t,
@@ -621,7 +621,7 @@ func TestRestoreHistory(t *testing.T) {
 		repository = GetRepository(dir.Path())
 		repository.Restore(save3.Id, ".")
 
-		fsAssert.Equal(t, repository.head, filesystems.INITAL_REF_NAME)
+		fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
 		fsAssert.Assert(
 			t,
 			fs.Equal(
@@ -667,7 +667,7 @@ func TestRestoreHistory(t *testing.T) {
 		repository = GetRepository(dir.Path())
 		repository.Restore(save0.Id, ".")
 
-		fsAssert.Equal(t, repository.head, filesystems.INITAL_REF_NAME)
+		fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
 		fsAssert.Assert(
 			t,
 			fs.Equal(
@@ -697,7 +697,7 @@ func TestRestoreHistory(t *testing.T) {
 		repository = GetRepository(dir.Path())
 		repository.Restore(save5.Id, ".")
 
-		fsAssert.Equal(t, repository.head, filesystems.INITAL_REF_NAME)
+		fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
 		fsAssert.Assert(
 			t,
 			fs.Equal(

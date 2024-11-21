@@ -26,8 +26,8 @@ func TestInitRepository(t *testing.T) {
 				t,
 				fs.WithDir(
 					filesystems.REPOSITORY_FOLDER_NAME,
-					fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystems.INITAL_REF_NAME)),
-					fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITAL_REF_NAME),
+					fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystems.INITIAL_REF_NAME)),
+					fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITIAL_REF_NAME),
 					fs.WithFile(filesystems.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
 					fs.WithDir(filesystems.SAVES_FOLDER_NAME),
 					fs.WithDir(filesystems.OBJECTS_FOLDER_NAME),
@@ -50,7 +50,7 @@ func TestGetRepository(t *testing.T) {
 	repository := GetRepository(dir.Path())
 
 	fsAssert.Equal(t, repository.fs.Root, dir.Path())
-	fsAssert.Equal(t, repository.head, filesystems.INITAL_REF_NAME)
+	fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
 	assert.EqualValues(
 		t,
 		repository.index,

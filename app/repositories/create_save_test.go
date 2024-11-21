@@ -97,8 +97,8 @@ Files:
 			dir.Join(filesystems.REPOSITORY_FOLDER_NAME),
 			fs.Expected(
 				t,
-				fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n%s\n", filesystems.INITAL_REF_NAME, firstSave.Id)),
-				fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITAL_REF_NAME),
+				fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n%s\n", filesystems.INITIAL_REF_NAME, firstSave.Id)),
+				fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITIAL_REF_NAME),
 				fs.WithFile(filesystems.INDEX_FILE_NAME, "Tracked files:\n\n"),
 				fs.WithDir(filesystems.SAVES_FOLDER_NAME,
 					fs.WithFile(firstSave.Id, expectedFirstSaveFileContent),
@@ -176,8 +176,8 @@ Files:
 			dir.Join(filesystems.REPOSITORY_FOLDER_NAME),
 			fs.Expected(
 				t,
-				fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n%s\n", filesystems.INITAL_REF_NAME, secondSave.Id)),
-				fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITAL_REF_NAME),
+				fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n%s\n", filesystems.INITIAL_REF_NAME, secondSave.Id)),
+				fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITIAL_REF_NAME),
 				fs.WithFile(filesystems.INDEX_FILE_NAME, "Tracked files:\n\n"),
 				fs.WithDir(filesystems.SAVES_FOLDER_NAME,
 					fs.WithFile(firstSave.Id, expectedFirstSaveFileContent),

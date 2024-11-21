@@ -26,7 +26,7 @@ const (
 	HEAD_FILE_NAME         = "head"
 	REFS_FILE_NAME         = "refs"
 
-	INITAL_REF_NAME = "master"
+	INITIAL_REF_NAME = "master"
 )
 
 type Save struct {
@@ -63,14 +63,14 @@ func Create(root string) *FileSystem {
 	errors.Check(err)
 	defer refsFile.Close()
 
-	_, err = refsFile.Write([]byte(fmt.Sprintf("Refs:\n\n%s\n\n", INITAL_REF_NAME)))
+	_, err = refsFile.Write([]byte(fmt.Sprintf("Refs:\n\n%s\n\n", INITIAL_REF_NAME)))
 	errors.Check(err)
 
 	headFile, err := os.Create(path.Join(root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME))
 	errors.Check(err)
 	defer headFile.Close()
 
-	_, err = headFile.Write([]byte(INITAL_REF_NAME))
+	_, err = headFile.Write([]byte(INITIAL_REF_NAME))
 	errors.Check(err)
 
 	err = os.Mkdir(path.Join(root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME), 0644)
@@ -84,6 +84,34 @@ func Create(root string) *FileSystem {
 
 func Open(root string) *FileSystem {
 	return &FileSystem{Root: root}
+}
+
+func (save *Save) Contains(otherSave *Save) bool {
+	otherSaveCheckpoint := otherSave.Checkpoints[len(otherSave.Checkpoints)-1]
+
+	for idx := len(save.Checkpoints) - 1; idx >= 0; idx-- {
+		if save.Checkpoints[idx].Id == otherSaveCheckpoint.Id {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (save *Save) FindFirstCommonCheckpointParent(otherSave *Save) *Checkpoint {
+	seen := make(map[string]*Checkpoint)
+
+	for idx := len(otherSave.Checkpoints) - 2; idx >= 0; idx-- {
+		seen[otherSave.Checkpoints[idx].Id] = otherSave.Checkpoints[idx]
+	}
+
+	for idx := len(save.Checkpoints) - 2; idx >= 0; idx-- {
+		if checkpoint, ok := seen[save.Checkpoints[idx].Id]; ok {
+			return checkpoint
+		}
+	}
+
+	return nil
 }
 
 func (fileSystem *FileSystem) SaveIndex(index []*directories.Change) {

@@ -228,9 +228,9 @@ func TestLoad(t *testing.T) {
 	{
 
 		repository = GetRepository(dir.Path())
-		repository.Load(filesystems.INITAL_REF_NAME)
+		repository.Load(filesystems.INITIAL_REF_NAME)
 
-		assert.Equal(t, repository.head, filesystems.INITAL_REF_NAME)
+		assert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
 		assert.False(t, repository.isDetachedMode())
 		fsAssert.Assert(
 			t,

@@ -52,8 +52,8 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 			fs.WithFile("6f6367cbecfac86af4e749156e1b1046524eff9afbd8a29c964c3b46ebdf7fc2", ""),
 			fs.WithFile("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", ""),
 		),
-		fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\r\n\r\n%s\r\n3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2\r\n", filesystems.INITAL_REF_NAME)),
-		fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITAL_REF_NAME),
+		fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\r\n\r\n%s\r\n3f674c71a3596db8f24fd31a85c503ae600898cc03810fcc171781d4f35531d2\r\n", filesystems.INITIAL_REF_NAME)),
+		fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITIAL_REF_NAME),
 		fs.WithFile(filesystems.INDEX_FILE_NAME, fmt.Sprintf(`Tracked files:
 	
 %s	(created)

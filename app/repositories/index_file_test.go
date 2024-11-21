@@ -42,8 +42,8 @@ func TestIndexFile(t *testing.T) {
 				dir.Join(filesystems.REPOSITORY_FOLDER_NAME),
 				fs.Expected(
 					t,
-					fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystems.INITAL_REF_NAME)),
-					fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITAL_REF_NAME),
+					fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystems.INITIAL_REF_NAME)),
+					fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITIAL_REF_NAME),
 					fs.WithFile(filesystems.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
 					fs.WithDir(filesystems.SAVES_FOLDER_NAME),
 					fs.WithDir(
@@ -79,8 +79,8 @@ func TestIndexFile(t *testing.T) {
 					dir.Join(filesystems.REPOSITORY_FOLDER_NAME),
 					fs.Expected(
 						t,
-						fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystems.INITAL_REF_NAME)),
-						fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITAL_REF_NAME),
+						fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystems.INITIAL_REF_NAME)),
+						fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITIAL_REF_NAME),
 						fs.WithFile(filesystems.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
 						fs.WithDir(filesystems.SAVES_FOLDER_NAME),
 						fs.WithDir(
@@ -132,8 +132,8 @@ func TestIndexFile(t *testing.T) {
 				dir.Join(filesystems.REPOSITORY_FOLDER_NAME),
 				fs.Expected(
 					t,
-					fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystems.INITAL_REF_NAME)),
-					fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITAL_REF_NAME),
+					fs.WithFile(filesystems.REFS_FILE_NAME, fmt.Sprintf("Refs:\n\n%s\n\n", filesystems.INITIAL_REF_NAME)),
+					fs.WithFile(filesystems.HEAD_FILE_NAME, filesystems.INITIAL_REF_NAME),
 					fs.WithFile(filesystems.INDEX_FILE_NAME, "Tracked files:\r\n\r\n"),
 					fs.WithDir(filesystems.SAVES_FOLDER_NAME),
 					fs.WithDir(

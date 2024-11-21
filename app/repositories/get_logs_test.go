@@ -18,7 +18,7 @@ func TestGetLogs(t *testing.T) {
 	assert.EqualValues(
 		t,
 		repository.GetLogs(),
-		&Log{Head: filesystems.INITAL_REF_NAME, History: []*SaveLog{}},
+		&Log{Head: filesystems.INITIAL_REF_NAME, History: []*SaveLog{}},
 	)
 
 	// After Save 0
@@ -30,10 +30,10 @@ func TestGetLogs(t *testing.T) {
 	save0, _ := repository.CreateSave("save0")
 
 	log := repository.GetLogs()
-	assert.Equal(t, log.Head, filesystems.INITAL_REF_NAME)
+	assert.Equal(t, log.Head, filesystems.INITIAL_REF_NAME)
 	assert.Equal(t, len(log.History), 1)
 	assert.Equal(t, len(log.History[0].Refs), 1)
-	assert.Equal(t, log.History[0].Refs[0], filesystems.INITAL_REF_NAME)
+	assert.Equal(t, log.History[0].Refs[0], filesystems.INITIAL_REF_NAME)
 	assert.Equal(t, log.History[0].Checkpoint.Id, save0.Id)
 	assert.Equal(t, log.History[0].Checkpoint.Message, save0.Message)
 	assert.Equal(t, log.History[0].Checkpoint.Parent, save0.Parent)
@@ -70,7 +70,7 @@ func TestGetLogs(t *testing.T) {
 	assert.EqualValues(t, log.History[0].Checkpoint.Changes, save1.Changes)
 
 	assert.Equal(t, len(log.History[1].Refs), 1)
-	assert.Equal(t, log.History[1].Refs[0], filesystems.INITAL_REF_NAME)
+	assert.Equal(t, log.History[1].Refs[0], filesystems.INITIAL_REF_NAME)
 	assert.Equal(t, log.History[1].Checkpoint.Id, save0.Id)
 	assert.Equal(t, log.History[1].Checkpoint.Message, save0.Message)
 	assert.Equal(t, log.History[1].Checkpoint.Parent, save0.Parent)
@@ -116,7 +116,7 @@ func TestGetLogs(t *testing.T) {
 	assert.EqualValues(t, log.History[1].Checkpoint.Changes, save1.Changes)
 
 	assert.Equal(t, len(log.History[2].Refs), 1)
-	assert.Equal(t, log.History[2].Refs[0], filesystems.INITAL_REF_NAME)
+	assert.Equal(t, log.History[2].Refs[0], filesystems.INITIAL_REF_NAME)
 	assert.Equal(t, log.History[2].Checkpoint.Id, save0.Id)
 	assert.Equal(t, log.History[2].Checkpoint.Message, save0.Message)
 	assert.Equal(t, log.History[2].Checkpoint.Parent, save0.Parent)
