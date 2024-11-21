@@ -159,7 +159,17 @@ func (repository *Repository) getSave(ref string) *filesystems.Save {
 	return repository.fs.ReadSave(checkpointId)
 }
 
-func buildDirFromSave(root string, save *filesystems.Save) *directories.Dir {
+func (repository *Repository) resolvePath(path string) (string, error) {
+	normalizedPath, err := repository.dir.NormalizePath(path)
+
+	if err != nil {
+		return "", &ValidationError{err.Error()}
+	}
+
+	return normalizedPath, nil
+}
+
+func buildDir(root string, save *filesystems.Save) *directories.Dir {
 	dir := &directories.Dir{Path: root, Children: map[string]*directories.Node{}}
 
 	for _, checkpoint := range save.Checkpoints {
@@ -174,12 +184,18 @@ func buildDirFromSave(root string, save *filesystems.Save) *directories.Dir {
 	return dir
 }
 
-func (repository *Repository) resolvePath(path string) (string, error) {
-	normalizedPath, err := repository.dir.NormalizePath(path)
+func (repository *Repository) applyDir(dir *directories.Dir) {
+	nodes := dir.PreOrderTraversal()
 
-	if err != nil {
-		return "", &ValidationError{err.Error()}
+	if dir.Path == repository.fs.Root {
+		// if we are traversing the root dir, the root dir folder should be removed from the response.
+
+		nodes = nodes[1:]
 	}
 
-	return normalizedPath, nil
+	repository.fs.SafeRemoveWorkingDir(dir.Path)
+
+	for _, node := range nodes {
+		repository.fs.CreateNode(node)
+	}
 }

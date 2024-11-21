@@ -11,13 +11,13 @@ func (repository *Repository) Load(ref string) error {
 		return &ValidationError{"unsaved changes."}
 	}
 
-	dir := buildDirFromSave(repository.fs.Root, save)
+	dir := buildDir(repository.fs.Root, save)
 
 	nodes := dir.PreOrderTraversal()
 	// if we are traversing the root dir, the root-dir-file should be removed from the response.
 	nodes = nodes[1:]
 
-	repository.fs.SafeRemoveWorkingDir(dir)
+	repository.fs.SafeRemoveWorkingDir(dir.Path)
 
 	for _, node := range nodes {
 		repository.fs.CreateNode(node)

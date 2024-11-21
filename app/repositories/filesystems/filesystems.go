@@ -10,7 +10,7 @@ import (
 	"io"
 	"log"
 	"os"
-	path "path/filepath"
+	Path "path/filepath"
 	"saymow/version-manager/app/pkg/errors"
 	"saymow/version-manager/app/repositories/directories"
 	"slices"
@@ -49,34 +49,34 @@ type FileSystem struct {
 type Refs map[string]string
 
 func Create(root string) *FileSystem {
-	err := os.Mkdir(path.Join(root, REPOSITORY_FOLDER_NAME), 0644)
+	err := os.Mkdir(Path.Join(root, REPOSITORY_FOLDER_NAME), 0644)
 	errors.Check(err)
 
-	indexFile, err := os.Create(path.Join(root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
+	indexFile, err := os.Create(Path.Join(root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
 	errors.Check(err)
 	defer indexFile.Close()
 
 	_, err = indexFile.Write([]byte("Tracked files:\r\n\r\n"))
 	errors.Check(err)
 
-	refsFile, err := os.Create(path.Join(root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME))
+	refsFile, err := os.Create(Path.Join(root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME))
 	errors.Check(err)
 	defer refsFile.Close()
 
 	_, err = refsFile.Write([]byte(fmt.Sprintf("Refs:\n\n%s\n\n", INITIAL_REF_NAME)))
 	errors.Check(err)
 
-	headFile, err := os.Create(path.Join(root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME))
+	headFile, err := os.Create(Path.Join(root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME))
 	errors.Check(err)
 	defer headFile.Close()
 
 	_, err = headFile.Write([]byte(INITIAL_REF_NAME))
 	errors.Check(err)
 
-	err = os.Mkdir(path.Join(root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME), 0644)
+	err = os.Mkdir(Path.Join(root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME), 0644)
 	errors.Check(err)
 
-	err = os.Mkdir(path.Join(root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME), 0644)
+	err = os.Mkdir(Path.Join(root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME), 0644)
 	errors.Check(err)
 
 	return &FileSystem{Root: root}
@@ -119,7 +119,7 @@ func (save *Save) FindFirstCommonCheckpointParent(otherSave *Save) *Checkpoint {
 }
 
 func (fileSystem *FileSystem) SaveIndex(index []*directories.Change) {
-	file, err := os.OpenFile(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
+	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
 	errors.Check(err)
 
 	_, err = file.Write([]byte("Tracked files:\n\n"))
@@ -178,7 +178,7 @@ func (fileSystem *FileSystem) parseIndex(file *os.File) []*directories.Change {
 }
 
 func (fileSystem *FileSystem) ReadIndex() []*directories.Change {
-	file, err := os.OpenFile(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_RDONLY, 0644)
+	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_RDONLY, 0644)
 	errors.Check(err)
 	defer file.Close()
 
@@ -188,7 +188,7 @@ func (fileSystem *FileSystem) ReadIndex() []*directories.Change {
 func (fileSystem *FileSystem) ReadRefs() *Refs {
 	refs := Refs{}
 
-	file, err := os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME))
+	file, err := os.Open(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME))
 	errors.Check(err)
 	defer file.Close()
 
@@ -212,7 +212,7 @@ func (fileSystem *FileSystem) ReadRefs() *Refs {
 }
 
 func (fileSystem *FileSystem) WriteRefs(refs *Refs) {
-	file, err := os.OpenFile(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0644)
 	errors.Check(err)
 	defer file.Close()
 
@@ -226,7 +226,7 @@ func (fileSystem *FileSystem) WriteRefs(refs *Refs) {
 }
 
 func (fileSystem *FileSystem) WriteHead(name string) {
-	file, err := os.OpenFile(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0644)
 	errors.Check(err)
 
 	_, err = file.Write([]byte(name))
@@ -245,7 +245,7 @@ func (fileSystem *FileSystem) parseHead(file *os.File) string {
 }
 
 func (fileSystem *FileSystem) ReadHead() string {
-	file, err := os.OpenFile(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_RDONLY, 0644)
+	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_RDONLY, 0644)
 	errors.Check(err)
 	defer file.Close()
 
@@ -257,7 +257,7 @@ func (fileSystem *FileSystem) ReadDir(saveName string) directories.Dir {
 	changes := []directories.Change{}
 
 	for saveName != "" {
-		file, err := os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
+		file, err := os.Open(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
 		errors.Check(err)
 
 		scanner := bufio.NewScanner(file)
@@ -352,7 +352,7 @@ func (fileSystem *FileSystem) WriteObject(filepath string, file *os.File) *direc
 	hash := hasher.Sum(nil)
 
 	objectName := hex.EncodeToString(hash)
-	objectFile, err := os.Create(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, objectName))
+	objectFile, err := os.Create(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, objectName))
 	errors.Check(err)
 	defer objectFile.Close()
 
@@ -365,7 +365,7 @@ func (fileSystem *FileSystem) WriteObject(filepath string, file *os.File) *direc
 }
 
 func (fileSystem *FileSystem) RemoveObject(name string) {
-	err := os.Remove(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, name))
+	err := os.Remove(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, name))
 	errors.Check(err)
 }
 
@@ -404,7 +404,7 @@ func (fileSystem *FileSystem) WriteSave(save *Checkpoint) string {
 
 	saveName := hex.EncodeToString(hash)
 
-	file, err := os.Create(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
+	file, err := os.Create(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
 	errors.Check(err)
 	defer file.Close()
 
@@ -479,7 +479,7 @@ func (fileSystem *FileSystem) ParseCheckpoint(id string, file *os.File) *Checkpo
 func (fileSystem *FileSystem) ReadSave(checkpointId string) *Save {
 	save := &Save{Id: checkpointId}
 
-	checkpointFile, err := os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
+	checkpointFile, err := os.Open(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -493,7 +493,7 @@ func (fileSystem *FileSystem) ReadSave(checkpointId string) *Save {
 
 	for save.Checkpoints[len(save.Checkpoints)-1].Parent != "" {
 		checkpointId = save.Checkpoints[len(save.Checkpoints)-1].Parent
-		checkpointFile, err = os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
+		checkpointFile, err = os.Open(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
 		errors.Check(err)
 		save.Checkpoints = append(save.Checkpoints, fileSystem.ParseCheckpoint(checkpointId, checkpointFile))
 		checkpointFile.Close()
@@ -516,7 +516,7 @@ func (fileSystem *FileSystem) createFile(file *directories.File) {
 	}
 	defer sourceFile.Close()
 
-	objectFile, err := os.Open(path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, file.ObjectName))
+	objectFile, err := os.Open(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, file.ObjectName))
 	errors.Check(err)
 	defer objectFile.Close()
 
@@ -553,9 +553,9 @@ func (fileSystem *FileSystem) CreateNode(node *directories.Node) {
 // Safely remove a directory
 //
 // This helper prevents the .repository dir to be removed
-func (fileSystem *FileSystem) SafeRemoveWorkingDir(dir *directories.Dir) {
-	if dir.Path != fileSystem.Root {
-		err := os.RemoveAll(dir.Path)
+func (fileSystem *FileSystem) SafeRemoveWorkingDir(path string) {
+	if path != fileSystem.Root {
+		err := os.RemoveAll(path)
 		errors.Check(err)
 		return
 	}
@@ -568,7 +568,7 @@ func (fileSystem *FileSystem) SafeRemoveWorkingDir(dir *directories.Dir) {
 			continue
 		}
 
-		filepath := path.Join(fileSystem.Root, entry.Name())
+		filepath := Path.Join(fileSystem.Root, entry.Name())
 
 		if entry.IsDir() {
 			err := os.RemoveAll(filepath)

@@ -11,14 +11,13 @@ import (
 func (repository *Repository) handleMergeSave(refSave *filesystems.Save, incomingSave *filesystems.Save, ref, incoming string) *filesystems.Checkpoint {
 	commonCheckpoint := refSave.FindFirstCommonCheckpointParent(incomingSave)
 	ancestorSave := repository.getSave(commonCheckpoint.Id)
-	dir := buildDirFromSave(repository.fs.Root, ancestorSave)
+	dir := buildDir(repository.fs.Root, ancestorSave)
 	refCommonAncestorIdx := collections.FindIndex(refSave.Checkpoints, func(checkpoint *filesystems.Checkpoint, _ int) bool {
 		return checkpoint.Id == commonCheckpoint.Id
 	})
 	incomingAncestorIdx := collections.FindIndex(incomingSave.Checkpoints, func(checkpoint *filesystems.Checkpoint, _ int) bool {
 		return checkpoint.Id == commonCheckpoint.Id
 	})
-
 	save := filesystems.Checkpoint{
 		Message:   fmt.Sprintf("Merge \"%s\" at \"%s\".", incoming, ref),
 		Parent:    refSave.Id,
@@ -46,15 +45,7 @@ func (repository *Repository) handleMergeSave(refSave *filesystems.Save, incomin
 
 	save.Id = repository.fs.WriteSave(&save)
 	repository.setRef(repository.head, save.Id)
-
-	repository.fs.SafeRemoveWorkingDir(dir)
-
-	nodes := dir.PreOrderTraversal()
-	nodes = nodes[1:]
-
-	for _, node := range nodes {
-		repository.fs.CreateNode(node)
-	}
+	repository.applyDir(dir)
 
 	return &save
 }
@@ -76,23 +67,13 @@ func (repository *Repository) Merge(ref string) (*filesystems.Checkpoint, error)
 		return nil, &ValidationError{"unsaved changes."}
 	}
 
-	// Fast forward
 	if incomingSave.Contains(refSave) {
+		// Fast forward
 
-		dir := buildDirFromSave(repository.fs.Root, incomingSave)
+		dir := buildDir(repository.fs.Root, incomingSave)
 
-		nodes := dir.PreOrderTraversal()
-		// if we are traversing the root dir, the root-dir-file should be removed from the response.
-		nodes = nodes[1:]
-
-		repository.fs.SafeRemoveWorkingDir(dir)
-
-		for _, node := range nodes {
-			repository.fs.CreateNode(node)
-		}
-
+		repository.applyDir(dir)
 		repository.setRef(repository.head, incomingSave.Id)
-
 		return incomingSave.Checkpoint(), nil
 	}
 

@@ -37,7 +37,7 @@ func (repository *Repository) Restore(ref string, path string) error {
 		return &ValidationError{"invalid ref."}
 	}
 
-	node := buildDirFromSave(repository.fs.Root, save).FindNode(resolvedPath)
+	node := buildDir(repository.fs.Root, save).FindNode(resolvedPath)
 	if node == nil {
 		return &ValidationError{"invalid path."}
 	}
@@ -98,19 +98,7 @@ func (repository *Repository) Restore(ref string, path string) error {
 	}
 
 	if node.NodeType == directories.DirType {
-		nodes := node.Dir.PreOrderTraversal()
-
-		if node.Dir.Path == repository.fs.Root {
-			// if we are traversing the root dir, the root-dir-file should be removed from the response.
-
-			nodes = nodes[1:]
-		}
-
-		repository.fs.SafeRemoveWorkingDir(node.Dir)
-
-		for _, node := range nodes {
-			repository.fs.CreateNode(node)
-		}
+		repository.applyDir(node.Dir)
 	} else {
 		repository.fs.CreateNode(node)
 	}
