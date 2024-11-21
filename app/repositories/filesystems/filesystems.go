@@ -98,6 +98,10 @@ func (save *Save) Contains(otherSave *Save) bool {
 	return false
 }
 
+func (save *Save) Checkpoint() *Checkpoint {
+	return save.Checkpoints[len(save.Checkpoints)-1]
+}
+
 func (save *Save) FindFirstCommonCheckpointParent(otherSave *Save) *Checkpoint {
 	seen := make(map[string]*Checkpoint)
 
