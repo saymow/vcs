@@ -49,9 +49,9 @@ func Start() {
 	case "refs":
 		handlers.ShowRefs()
 	case "add <path>":
-		handlers.TrackFiles(ctx.Args[1:])
+		handlers.Add(ctx.Args[1:])
 	case "rm <path>":
-		handlers.UntrackFiles(ctx.Args[1:])
+		handlers.Remove(ctx.Args[1:])
 	case "save <message>":
 		handlers.Save(ctx.Args[1])
 	case "restore <path>":

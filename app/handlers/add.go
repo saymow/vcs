@@ -6,7 +6,7 @@ import (
 	"saymow/version-manager/app/repositories"
 )
 
-func TrackFiles(paths []string) {
+func Add(paths []string) {
 	dir, err := os.Getwd()
 	errors.Check(err)
 

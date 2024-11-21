@@ -6,7 +6,7 @@ import (
 	"saymow/version-manager/app/repositories"
 )
 
-func UntrackFiles(paths []string) {
+func Remove(paths []string) {
 	dir, err := os.Getwd()
 	errors.Check(err)
 
