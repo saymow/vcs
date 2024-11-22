@@ -19,7 +19,7 @@ func (repository *Repository) IndexFile(filepath string) error {
 
 	file, err := os.Open(filepath)
 	errors.Check(err)
-	defer file.Close()
+	defer errors.CheckFn(file.Close)
 
 	object := repository.fs.WriteObject(filepath, file)
 	stagedChangeIdx := repository.findStagedChangeIdx(filepath)

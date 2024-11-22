@@ -54,21 +54,21 @@ func Create(root string) *FileSystem {
 
 	indexFile, err := os.Create(Path.Join(root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME))
 	errors.Check(err)
-	defer indexFile.Close()
+	defer errors.CheckFn(indexFile.Close)
 
 	_, err = indexFile.Write([]byte("Tracked files:\r\n\r\n"))
 	errors.Check(err)
 
 	refsFile, err := os.Create(Path.Join(root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME))
 	errors.Check(err)
-	defer refsFile.Close()
+	defer errors.CheckFn(refsFile.Close)
 
 	_, err = refsFile.Write([]byte(fmt.Sprintf("Refs:\n\n%s\n\n", INITIAL_REF_NAME)))
 	errors.Check(err)
 
 	headFile, err := os.Create(Path.Join(root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME))
 	errors.Check(err)
-	defer headFile.Close()
+	defer errors.CheckFn(headFile.Close)
 
 	_, err = headFile.Write([]byte(INITIAL_REF_NAME))
 	errors.Check(err)
@@ -119,8 +119,9 @@ func (save *Save) FindFirstCommonCheckpointParent(otherSave *Save) *Checkpoint {
 }
 
 func (fileSystem *FileSystem) SaveIndex(index []*directories.Change) {
-	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0755)
+	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0644)
 	errors.Check(err)
+	defer errors.CheckFn(file.Close)
 
 	_, err = file.Write([]byte("Tracked files:\n\n"))
 	errors.Check(err)
@@ -180,7 +181,7 @@ func (fileSystem *FileSystem) parseIndex(file *os.File) []*directories.Change {
 func (fileSystem *FileSystem) ReadIndex() []*directories.Change {
 	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, INDEX_FILE_NAME), os.O_RDONLY, 0644)
 	errors.Check(err)
-	defer file.Close()
+	defer errors.CheckFn(file.Close)
 
 	return fileSystem.parseIndex(file)
 }
@@ -190,7 +191,7 @@ func (fileSystem *FileSystem) ReadRefs() *Refs {
 
 	file, err := os.Open(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME))
 	errors.Check(err)
-	defer file.Close()
+	defer errors.CheckFn(file.Close)
 
 	scanner := bufio.NewScanner(file)
 
@@ -214,7 +215,7 @@ func (fileSystem *FileSystem) ReadRefs() *Refs {
 func (fileSystem *FileSystem) WriteRefs(refs *Refs) {
 	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, REFS_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0644)
 	errors.Check(err)
-	defer file.Close()
+	defer errors.CheckFn(file.Close)
 
 	_, err = file.Write([]byte("Refs:\n\n"))
 	errors.Check(err)
@@ -228,6 +229,7 @@ func (fileSystem *FileSystem) WriteRefs(refs *Refs) {
 func (fileSystem *FileSystem) WriteHead(name string) {
 	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_WRONLY|os.O_TRUNC, 0644)
 	errors.Check(err)
+	defer errors.CheckFn(file.Close)
 
 	_, err = file.Write([]byte(name))
 	errors.Check(err)
@@ -247,7 +249,7 @@ func (fileSystem *FileSystem) parseHead(file *os.File) string {
 func (fileSystem *FileSystem) ReadHead() string {
 	file, err := os.OpenFile(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, HEAD_FILE_NAME), os.O_RDONLY, 0644)
 	errors.Check(err)
-	defer file.Close()
+	defer errors.CheckFn(file.Close)
 
 	return fileSystem.parseHead(file)
 }
@@ -313,7 +315,7 @@ func (fileSystem *FileSystem) ReadDir(saveName string) directories.Dir {
 			changes = append(changes, change)
 		}
 
-		file.Close()
+		errors.Check(file.Close())
 	}
 
 	slices.Reverse(changes)
@@ -354,12 +356,12 @@ func (fileSystem *FileSystem) WriteObject(filepath string, file *os.File) *direc
 	objectName := hex.EncodeToString(hash)
 	objectFile, err := os.Create(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, objectName))
 	errors.Check(err)
-	defer objectFile.Close()
+	defer errors.CheckFn(objectFile.Close)
 
 	compressor := gzip.NewWriter(objectFile)
 	_, err = compressor.Write(buffer.Bytes())
 	errors.Check(err)
-	compressor.Close()
+	defer errors.CheckFn(compressor.Close)
 
 	return &directories.File{Filepath: filepath, ObjectName: objectName}
 }
@@ -406,7 +408,7 @@ func (fileSystem *FileSystem) WriteSave(save *Checkpoint) string {
 
 	file, err := os.Create(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, saveName))
 	errors.Check(err)
-	defer file.Close()
+	defer errors.CheckFn(file.Close)
 
 	_, err = file.Write([]byte(saveContent))
 	errors.Check(err)
@@ -487,7 +489,7 @@ func (fileSystem *FileSystem) ReadSave(checkpointId string) *Save {
 
 		errors.Error(err.Error())
 	}
-	defer checkpointFile.Close()
+	defer errors.CheckFn(checkpointFile.Close)
 
 	save.Checkpoints = append(save.Checkpoints, fileSystem.ParseCheckpoint(checkpointId, checkpointFile))
 
@@ -496,7 +498,7 @@ func (fileSystem *FileSystem) ReadSave(checkpointId string) *Save {
 		checkpointFile, err = os.Open(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, SAVES_FOLDER_NAME, checkpointId))
 		errors.Check(err)
 		save.Checkpoints = append(save.Checkpoints, fileSystem.ParseCheckpoint(checkpointId, checkpointFile))
-		checkpointFile.Close()
+		errors.Check(checkpointFile.Close())
 	}
 
 	slices.Reverse(save.Checkpoints)
@@ -514,14 +516,15 @@ func (fileSystem *FileSystem) createFile(file *directories.File) {
 		sourceFile, err = os.Create(file.Filepath)
 		errors.Check(err)
 	}
-	defer sourceFile.Close()
+	defer errors.CheckFn(sourceFile.Close)
 
 	objectFile, err := os.Open(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, file.ObjectName))
 	errors.Check(err)
-	defer objectFile.Close()
+	defer errors.CheckFn(objectFile.Close)
 
 	decompressor, err := gzip.NewReader(objectFile)
 	errors.Check(err)
+	defer errors.CheckFn(decompressor.Close)
 
 	buffer := make([]byte, 256)
 

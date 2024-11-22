@@ -1,18 +1,24 @@
 package errors
 
 import (
-	"log"
 	"runtime/debug"
 )
 
 func Check(err error) {
 	if err != nil {
-		debug.PrintStack()
-		log.Fatal(err)
+		Error(err.Error())
+	}
+}
+
+func CheckFn(fn func() error) {
+	err := fn()
+
+	if err != nil {
+		Error(err.Error())
 	}
 }
 
 func Error(message string) {
 	debug.PrintStack()
-	log.Fatal(message)
+	panic(message)
 }

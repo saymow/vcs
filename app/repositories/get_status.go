@@ -50,7 +50,7 @@ func (repository *Repository) GetStatus() *Status {
 
 		file, err := os.Open(filepath)
 		errors.Check(err)
-		defer file.Close()
+		defer errors.CheckFn(file.Close)
 
 		var buffer bytes.Buffer
 		chunkBuffer := make([]byte, 1024)

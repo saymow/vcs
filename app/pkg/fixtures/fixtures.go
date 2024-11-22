@@ -9,17 +9,21 @@ import (
 
 func FileExists(filepath string) bool {
 	f, err := os.Open(filepath)
+	f.Close()
 	if err != nil {
-		defer f.Close()
+		if os.IsNotExist(err) {
+			return false
+		}
+		errors.Error(err.Error())
 	}
 
-	return !os.IsNotExist(err)
+	return true
 }
 
 func ReadFile(filepath string) string {
 	file, err := os.Open(filepath)
 	errors.Check(err)
-	defer file.Close()
+	defer errors.CheckFn(file.Close)
 
 	var str strings.Builder
 	buffer := make([]byte, 256)
@@ -51,8 +55,7 @@ func WriteFile(filepath string, content []byte) {
 		file, err = os.Create(filepath)
 		errors.Check(err)
 	}
-
-	defer file.Close()
+	defer errors.CheckFn(file.Close)
 
 	_, err = file.Write(content)
 	errors.Check(err)

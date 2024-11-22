@@ -34,7 +34,7 @@ func TestIndexFile(t *testing.T) {
 		var buffer bytes.Buffer
 		compressor := gzip.NewWriter(&buffer)
 		compressor.Write([]byte("1 content"))
-		compressor.Close()
+		errors.Check(compressor.Close())
 
 		fsAssert.Assert(
 			t,
@@ -111,6 +111,7 @@ func TestIndexFile(t *testing.T) {
 	{
 		file, err := os.OpenFile(dir.Join("1.txt"), os.O_WRONLY|os.O_TRUNC, 0644)
 		errors.Check(err)
+		defer errors.CheckFn(file.Close)
 
 		_, err = file.Write([]byte("1 new content"))
 		errors.Check(err)
@@ -188,6 +189,7 @@ func TestIndexFileComplexCases(t *testing.T) {
 		{
 			file, err := os.OpenFile(dir.Join("1.txt"), os.O_WRONLY|os.O_TRUNC, 0644)
 			errors.Check(err)
+			defer errors.CheckFn(file.Close)
 
 			_, err = file.Write([]byte("1 new content"))
 			errors.Check(err)
@@ -207,6 +209,7 @@ func TestIndexFileComplexCases(t *testing.T) {
 		{
 			file, err := os.OpenFile(dir.Join("1.txt"), os.O_WRONLY|os.O_TRUNC, 0644)
 			errors.Check(err)
+			defer errors.CheckFn(file.Close)
 
 			_, err = file.Write([]byte("1 content"))
 			errors.Check(err)
