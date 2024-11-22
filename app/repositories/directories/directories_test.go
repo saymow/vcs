@@ -556,3 +556,198 @@ func TestAbsPath(t *testing.T) {
 	assert.Error(t, err, "invalid path.")
 	assert.Equal(t, filepath, "")
 }
+
+func TestChangeConflicts(t *testing.T) {
+	// Distinct Filepaths
+
+	change := &Change{
+		ChangeType: Creation,
+		File: &File{
+			Filepath:   "a",
+			ObjectName: "",
+		},
+	}
+	assert.False(
+		t, change.Conflicts(&Change{
+			ChangeType: Removal,
+			Removal: &FileRemoval{
+				Filepath: "b",
+			},
+		}),
+	)
+
+	change = &Change{
+		ChangeType: Removal,
+		Removal: &FileRemoval{
+			Filepath: "b",
+		},
+	}
+	assert.False(
+		t, change.Conflicts(
+			&Change{
+				ChangeType: Creation,
+				File: &File{
+					Filepath:   "a",
+					ObjectName: "",
+				},
+			},
+		),
+	)
+
+	// Both are removals
+
+	change = &Change{
+		ChangeType: Removal,
+		Removal: &FileRemoval{
+			Filepath: "a",
+		},
+	}
+	assert.False(
+		t, change.Conflicts(&Change{
+			ChangeType: Removal,
+			Removal: &FileRemoval{
+				Filepath: "a",
+			},
+		}),
+	)
+
+	// Equal file hash
+
+	change = &Change{
+		ChangeType: Creation,
+		File: &File{
+			Filepath:   "a",
+			ObjectName: "hash",
+		},
+	}
+	assert.False(
+		t, change.Conflicts(&Change{
+			ChangeType: Modification,
+			File: &File{
+				Filepath:   "a",
+				ObjectName: "hash",
+			},
+		}),
+	)
+
+	change = &Change{
+		ChangeType: Modification,
+		File: &File{
+			Filepath:   "a",
+			ObjectName: "hash",
+		},
+	}
+	assert.False(
+		t, change.Conflicts(&Change{
+			ChangeType: Creation,
+			File: &File{
+				Filepath:   "a",
+				ObjectName: "hash",
+			},
+		}),
+	)
+
+	// Distinct file hash
+
+	change = &Change{
+		ChangeType: Modification,
+		File: &File{
+			Filepath:   "a",
+			ObjectName: "hash",
+		},
+	}
+	assert.True(
+		t, change.Conflicts(&Change{
+			ChangeType: Removal,
+			Removal: &FileRemoval{
+				Filepath: "a",
+			},
+		}),
+	)
+
+	change = &Change{
+		ChangeType: Removal,
+		Removal: &FileRemoval{
+			Filepath: "a",
+		},
+	}
+	assert.True(
+		t,
+		change.Conflicts(&Change{
+			ChangeType: Modification,
+			File: &File{
+				Filepath:   "a",
+				ObjectName: "hash",
+			},
+		}),
+	)
+
+	change = &Change{
+		ChangeType: Creation,
+		File: &File{
+			Filepath:   "a",
+			ObjectName: "hash",
+		},
+	}
+	assert.True(
+		t, change.Conflicts(&Change{
+			ChangeType: Removal,
+			Removal: &FileRemoval{
+				Filepath: "a",
+			},
+		}),
+	)
+
+	change = &Change{
+		ChangeType: Removal,
+		Removal: &FileRemoval{
+			Filepath: "a",
+		},
+	}
+	assert.True(
+		t,
+		change.Conflicts(&Change{
+			ChangeType: Creation,
+			File: &File{
+				Filepath:   "a",
+				ObjectName: "hash",
+			},
+		}),
+	)
+
+	change = &Change{
+		ChangeType: Creation,
+		File: &File{
+			Filepath:   "a",
+			ObjectName: "different-hash",
+		},
+	}
+	assert.True(
+		t,
+		change.Conflicts(&Change{
+			ChangeType: Creation,
+			File: &File{
+				Filepath:   "a",
+				ObjectName: "hash",
+			},
+		}),
+	)
+
+	change = &Change{
+		ChangeType: Modification,
+		File: &File{
+			Filepath:   "a",
+			ObjectName: "different-hash",
+		},
+	}
+	assert.True(
+		t,
+		change.Conflicts(&Change{
+			ChangeType: Modification,
+			File: &File{
+				Filepath:   "a",
+				ObjectName: "hash",
+			},
+		}),
+	)
+}
