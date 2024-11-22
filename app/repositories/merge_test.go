@@ -75,6 +75,11 @@ func TestInvalidMerge(t *testing.T) {
 
 	_, err = repository.Merge(meta.refName)
 	assert.Error(t, err, "Validaton Error: unsaved changes.")
+
+	repository.IndexFile(dir.Join("new_file.txt"))
+
+	_, err = repository.Merge(meta.refName)
+	assert.Error(t, err, "Validaton Error: unsaved changes.")
 }
 
 func TestFastForwardMerge(t *testing.T) {
