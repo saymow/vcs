@@ -55,16 +55,19 @@ func (repository *Repository) Merge(ref string) (*filesystems.Checkpoint, error)
 		return nil, &ValidationError{"cannot make changes in detached mode."}
 	}
 
-	incomingSave := repository.getSave(ref)
-	if incomingSave == nil {
-		return nil, &ValidationError{"invalid ref."}
+	if len(repository.index) > 0 {
+		return nil, &ValidationError{"unsaved changes."}
 	}
-
-	refSave := repository.getSave(repository.getCurrentSaveName())
 
 	workingDirStatus := repository.GetStatus().WorkingDir
 	if len(workingDirStatus.ModifiedFilePaths)+len(workingDirStatus.RemovedFilePaths)+len(workingDirStatus.UntrackedFilePaths) > 0 {
 		return nil, &ValidationError{"unsaved changes."}
+	}
+
+	refSave := repository.getSave(repository.getCurrentSaveName())
+	incomingSave := repository.getSave(ref)
+	if incomingSave == nil {
+		return nil, &ValidationError{"invalid ref."}
 	}
 
 	if incomingSave.Contains(refSave) {
