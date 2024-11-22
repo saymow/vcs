@@ -16,18 +16,26 @@ type FileRemoval struct {
 	Filepath string
 }
 
+type FileConflict struct {
+	Filepath   string
+	ObjectName string
+	Message    string
+}
+
 type ChangeType int
 
 const (
 	Creation ChangeType = iota
 	Modification
 	Removal
+	Conflict
 )
 
 type Change struct {
 	ChangeType ChangeType
 	File       *File
 	Removal    *FileRemoval
+	Conflict   *FileConflict
 }
 
 type File struct {
@@ -50,6 +58,7 @@ const (
 	MODIFIED_CHANGE = "(modified)"
 	CREATED_CHANGE  = "(created)"
 	REMOVAL_CHANGE  = "(removed)"
+	CONFLICT_CHANGE = "(conflicted)"
 )
 
 type DirError struct {
@@ -64,8 +73,33 @@ func (change *Change) GetPath() string {
 	if change.ChangeType == Removal {
 		return change.Removal.Filepath
 	}
+	if change.ChangeType == Conflict {
+		return change.Conflict.Filepath
+	}
 
 	return change.File.Filepath
+}
+
+func (change *Change) GetHash() string {
+	if change.ChangeType == Removal {
+		return ""
+	}
+	if change.ChangeType == Conflict {
+		return change.Conflict.ObjectName
+	}
+
+	return change.File.ObjectName
+}
+
+func (change *Change) Conflicts(otherChange *Change) bool {
+	if change.GetPath() != otherChange.GetPath() {
+		return false
+	}
+	if change.ChangeType == Removal && otherChange.ChangeType == Removal {
+		return false
+	}
+
+	return change.GetHash() != otherChange.GetHash()
 }
 
 func (root *Dir) addNodeHelper(segments []string, change *Change) {
