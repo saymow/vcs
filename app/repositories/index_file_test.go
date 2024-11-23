@@ -225,3 +225,99 @@ func TestIndexFileComplexCases(t *testing.T) {
 		}
 	}
 }
+
+func TestIndexConflictedFile(t *testing.T) {
+	dir, repository := fixtureNewProject(t)
+
+	// to make it easier to test, index is updated in place
+
+	// Test temporary conflict object (for some reason unchanged, so it becomes permanent)
+	{
+		// SETUP
+
+		tempObjectName := "cae2c9816a64843de42b6eaea3fd3f690e529e771d7491d8f409b7687960f82f"
+		fixtures.WriteFile(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, tempObjectName), []byte("x"))
+
+		repository.index = []*directories.Change{
+			{
+				ChangeType: directories.Conflict,
+				Conflict: &directories.FileConflict{
+					Filepath:   dir.Join("a.txt"),
+					ObjectName: tempObjectName,
+					Message:    "Conflict.",
+				},
+			},
+		}
+		repository.SaveIndex()
+
+		// TEST
+		fixtures.WriteFile(dir.Join("a.txt"), []byte("<ref>content a.</ref><incoming>content b.</incoming>"))
+		repository.IndexFile(dir.Join("a.txt"))
+
+		assert.Equal(t, len(repository.index), 1)
+		assert.Equal(t, repository.index[0].ChangeType, directories.Creation)
+		assert.Equal(t, repository.index[0].File.Filepath, dir.Join("a.txt"))
+		assert.Equal(t, repository.index[0].File.ObjectName, tempObjectName)
+		assert.True(t, fixtures.FileExists(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, tempObjectName)))
+	}
+
+	// Test temporary conflict object
+	{
+		// SETUP
+
+		tempObjectName := "cae2c9816a64843de42b6eaea3fd3f690e529e771d7491d8f409b7687960f82f"
+		fixtures.WriteFile(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, tempObjectName), []byte("x"))
+
+		repository.index = []*directories.Change{
+			{
+				ChangeType: directories.Conflict,
+				Conflict: &directories.FileConflict{
+					Filepath:   dir.Join("a.txt"),
+					ObjectName: tempObjectName,
+					Message:    "Conflict.",
+				},
+			},
+		}
+		repository.SaveIndex()
+
+		// TEST
+		fixtures.WriteFile(dir.Join("a.txt"), []byte("content a.\n"))
+		repository.IndexFile(dir.Join("a.txt"))
+
+		assert.Equal(t, len(repository.index), 1)
+		assert.Equal(t, repository.index[0].ChangeType, directories.Creation)
+		assert.Equal(t, repository.index[0].File.Filepath, dir.Join("a.txt"))
+		assert.NotEqual(t, repository.index[0].File.ObjectName, tempObjectName)
+		assert.False(t, fixtures.FileExists(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, tempObjectName)))
+	}
+
+	// Test permanent object (part of the history and therefore MUST NOT BE removed if the content changes)
+	{
+		// SETUP
+
+		permanentObjectName := "cae2c9816a64843de42b6eaea3fd3f690e529e771d7491d8f409b7687960f82f"
+		fixtures.WriteFile(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, permanentObjectName), []byte("x"))
+
+		repository.index = []*directories.Change{
+			{
+				ChangeType: directories.Conflict,
+				Conflict: &directories.FileConflict{
+					Filepath:   dir.Join("a.txt"),
+					ObjectName: permanentObjectName,
+					Message:    "Removed at \"incoming\" but modified at \"ref\".",
+				},
+			},
+		}
+		repository.SaveIndex()
+
+		// TEST
+		fixtures.WriteFile(dir.Join("a.txt"), []byte("definetely the hash is going to change."))
+		repository.IndexFile(dir.Join("a.txt"))
+
+		assert.Equal(t, len(repository.index), 1)
+		assert.Equal(t, repository.index[0].ChangeType, directories.Creation)
+		assert.Equal(t, repository.index[0].File.Filepath, dir.Join("a.txt"))
+		assert.NotEqual(t, repository.index[0].File.ObjectName, permanentObjectName)
+		assert.True(t, fixtures.FileExists(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, permanentObjectName)))
+	}
+}
