@@ -13,6 +13,60 @@ import (
 	"gotest.tools/v3/fs"
 )
 
+func TestInvalidCreateSave(t *testing.T) {
+	dir, repository := fixtureGetBaseProject(t)
+	defer dir.Remove()
+
+	// empty index
+	{
+		checkpoint, err := repository.CreateSave("invalid-save")
+		assert.Nil(t, checkpoint)
+		assert.Error(t, err, "Validation Error: cannot save empty index.")
+	}
+
+	// detached mode
+	{
+
+		// setup
+
+		fixtures.WriteFile(dir.Join("a.txt"), []byte("a.txt content."))
+
+		repository.IndexFile(dir.Join("a.txt"))
+		repository.SaveIndex()
+		save, _ := repository.CreateSave("valid-saved")
+
+		repository.setHead(save.Id)
+
+		repository = GetRepository(dir.Path())
+
+		// test
+
+		checkpoint, err := repository.CreateSave("invalid-save")
+		assert.Nil(t, checkpoint)
+		assert.Error(t, err, "Validation Error: cannot make changes in detached mode.")
+	}
+
+	// conflicted index
+	{
+		repository.setHead(filesystems.INITIAL_REF_NAME)
+
+		// manually messing with the index
+		repository.index = append(repository.index, &directories.Change{
+			ChangeType: directories.Conflict,
+			Conflict: &directories.FileConflict{
+				Filepath:   "b.txt",
+				ObjectName: "definetely-not-a-hash",
+				Message:    "Conflict.",
+			},
+		},
+		)
+
+		checkpoint, err := repository.CreateSave("invalid-save")
+		assert.Nil(t, checkpoint)
+		assert.Error(t, err, "Validation Error: index is conflicted.")
+	}
+}
+
 func TestCreateSave(t *testing.T) {
 	dir, _ := fixtureGetBaseProject(t)
 	defer dir.Remove()
