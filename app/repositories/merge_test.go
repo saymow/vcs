@@ -3,7 +3,9 @@ package repositories
 import (
 	"fmt"
 	Path "path/filepath"
+	"saymow/version-manager/app/pkg/collections"
 	"saymow/version-manager/app/pkg/fixtures"
+	"saymow/version-manager/app/repositories/directories"
 	"saymow/version-manager/app/repositories/filesystems"
 	"testing"
 
@@ -279,4 +281,200 @@ func TestNewSaveMerge(t *testing.T) {
 			),
 		)
 	}
+}
+
+func TestIndexConflictsMerge(t *testing.T) {
+	dir, repository, meta := makeBaseRepository(t)
+	defer dir.Remove()
+	incoming := "incoming"
+
+	repository.CreateRef(incoming)
+
+	// s1
+
+	repository = GetRepository(dir.Path())
+
+	fixtures.WriteFile(dir.Join("a.txt"), []byte("a.txt incoming content."))
+	fixtures.WriteFile(dir.Join("c.txt"), []byte("c.txt incoming content."))
+
+	repository.IndexFile(dir.Join("a.txt"))
+	repository.IndexFile(dir.Join("c.txt"))
+	repository.RemoveFile(dir.Join("b.txt"))
+	repository.SaveIndex()
+	repository.CreateSave("s1")
+
+	// s2
+
+	repository = GetRepository(dir.Path())
+
+	fixtures.WriteFile(dir.Join("a", "b.txt"), []byte("a/b.txt incoming updated content."))
+	fixtures.WriteFile(dir.Join("a", "c.txt"), []byte("a/c.txt incoming content."))
+	fixtures.MakeDirs(dir.Join("a", "b"))
+	fixtures.WriteFile(dir.Join("a", "b", "c.txt"), []byte("a/b/c.txt incoming content."))
+	fixtures.WriteFile(dir.Join("a", "b", "d.txt"), []byte("a/b/d.txt incoming content."))
+
+	repository.IndexFile(dir.Join("a", "b.txt"))
+	repository.IndexFile(dir.Join("a", "c.txt"))
+	repository.IndexFile(dir.Join("a", "b", "c.txt"))
+	repository.IndexFile(dir.Join("a", "b", "d.txt"))
+	repository.RemoveFile(dir.Join("a", "a.txt"))
+	repository.SaveIndex()
+	repository.CreateSave("s2")
+
+	// s3
+
+	repository = GetRepository(dir.Path())
+
+	fixtures.MakeDirs(dir.Join("c"))
+	fixtures.WriteFile(dir.Join("c", "a.txt"), []byte("c/a.txt incoming content."))
+
+	repository.IndexFile(dir.Join("c", "a.txt"))
+	repository.SaveIndex()
+	repository.CreateSave("s3")
+
+	// Load ref
+
+	repository = GetRepository(dir.Path())
+
+	repository.Load(meta.refName)
+
+	// s1'
+
+	repository = GetRepository(dir.Path())
+
+	fixtures.WriteFile(dir.Join("a.txt"), []byte("a.txt ref content."))
+	fixtures.WriteFile(dir.Join("b.txt"), []byte("b.txt ref updated content."))
+	fixtures.WriteFile(dir.Join("c.txt"), []byte("c.txt ref content."))
+	fixtures.WriteFile(dir.Join("a", "b.txt"), []byte("a/b.txt ref updated content."))
+
+	repository.IndexFile(dir.Join("a.txt"))
+	repository.IndexFile(dir.Join("b.txt"))
+	repository.IndexFile(dir.Join("c.txt"))
+	repository.IndexFile(dir.Join("a", "b.txt"))
+	repository.SaveIndex()
+	repository.CreateSave("s1'")
+
+	// s2'
+
+	repository = GetRepository(dir.Path())
+
+	fixtures.MakeDirs(dir.Join("c"))
+	fixtures.WriteFile(dir.Join("c", "a.txt"), []byte("c/a.txt ref content."))
+	fixtures.WriteFile(dir.Join("c", "b.txt"), []byte("c/b.txt ref content."))
+
+	repository.IndexFile(dir.Join("c", "a.txt"))
+	repository.IndexFile(dir.Join("c", "b.txt"))
+	repository.SaveIndex()
+	s2Prime, _ := repository.CreateSave("s2'")
+
+	// Test
+
+	repository = GetRepository(dir.Path())
+
+	checkpoint, err := repository.Merge(incoming)
+
+	changesMap := collections.ToMap(repository.index, func(change *directories.Change, _ int) string {
+		return change.GetPath()
+	})
+
+	assert.Equal(
+		t,
+		changesMap[dir.Join("a", "b", "c.txt")].ChangeType,
+		directories.Creation,
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("a", "b", "d.txt")].ChangeType,
+		directories.Creation,
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("a", "c.txt")].ChangeType,
+		directories.Creation,
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("a", "a.txt")].ChangeType,
+		directories.Removal,
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("a.txt")].ChangeType,
+		directories.Conflict,
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("a.txt")].Conflict.Message,
+		"Conflict.",
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("b.txt")].ChangeType,
+		directories.Conflict,
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("b.txt")].Conflict.Message,
+		"Removed at \"incoming\" but modified at \"ref\".",
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("c.txt")].ChangeType,
+		directories.Conflict,
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("c.txt")].Conflict.Message,
+		"Conflict.",
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("a", "b.txt")].ChangeType,
+		directories.Conflict,
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("a", "b.txt")].Conflict.Message,
+		"Conflict.",
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("c", "a.txt")].ChangeType,
+		directories.Conflict,
+	)
+	assert.Equal(
+		t,
+		changesMap[dir.Join("c", "a.txt")].Conflict.Message,
+		"Conflict.",
+	)
+	assert.Nil(t, err)
+	assert.Equal(t, checkpoint.Id, s2Prime.Id)
+	fsAssert.Assert(
+		t,
+		fs.Equal(
+			dir.Path(),
+			fs.Expected(
+				t,
+				fs.WithDir(filesystems.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+				fs.WithFile("a.txt", "<ref>\na.txt ref content.\n</ref>\n<incoming>\na.txt incoming content.\n</incoming>\n"),
+				fs.WithFile("b.txt", "b.txt ref updated content."),
+				fs.WithFile("c.txt", "<ref>\nc.txt ref content.\n</ref>\n<incoming>\nc.txt incoming content.\n</incoming>\n"),
+				fs.WithDir(
+					"a",
+					fs.WithFile("b.txt", "<ref>\na/b.txt ref updated content.\n</ref>\n<incoming>\na/b.txt incoming updated content.\n</incoming>\n"),
+					fs.WithFile("c.txt", "a/c.txt incoming content."),
+					fs.WithDir(
+						"b",
+						fs.WithFile("c.txt", "a/b/c.txt incoming content."),
+						fs.WithFile("d.txt", "a/b/d.txt incoming content."),
+					),
+				),
+				fs.WithDir(
+					"c",
+					fs.WithFile("a.txt", "<ref>\nc/a.txt ref content.\n</ref>\n<incoming>\nc/a.txt incoming content.\n</incoming>\n"),
+					fs.WithFile("b.txt", "c/b.txt ref content."),
+				),
+			),
+		),
+	)
 }
