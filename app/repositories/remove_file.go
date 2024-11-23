@@ -32,8 +32,12 @@ func (repository *Repository) RemoveFile(filepath string) error {
 			return nil
 		}
 
+		if !(repository.index[stagedChangeIdx].ChangeType == directories.Conflict && !repository.index[stagedChangeIdx].Conflict.IsObjectTemporary()) {
+			// Remove change object unless it is a conflict permanent object.
+
+			repository.fs.RemoveObject(repository.index[stagedChangeIdx].GetHash())
+		}
 		// Remove existing change from the index
-		repository.fs.RemoveObject(repository.index[stagedChangeIdx].File.ObjectName)
 		repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
 	}
 
