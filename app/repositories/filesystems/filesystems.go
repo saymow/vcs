@@ -136,7 +136,7 @@ func (fileSystem *FileSystem) SaveIndex(index []*directories.Change) {
 		case directories.Removal:
 			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n", change.Removal.Filepath, directories.REMOVAL_CHANGE)))
 		case directories.Conflict:
-			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\t%s\n", change.Conflict.Filepath, directories.CONFLICT_CHANGE, change.Conflict.Message)))
+			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\t%s\n%s\n", change.Conflict.Filepath, directories.CONFLICT_CHANGE, change.Conflict.Message, change.Conflict.ObjectName)))
 		default:
 			errors.Error("unreachable")
 		}
