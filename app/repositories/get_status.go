@@ -77,6 +77,15 @@ func (repository *Repository) GetStatus() *Status {
 		if stagedChange != nil {
 			if stagedChange.ChangeType == directories.Removal {
 				status.Staged.RemovedFilePaths = append(status.Staged.RemovedFilePaths, stagedChange.Removal.Filepath)
+			} else if stagedChange.ChangeType == directories.Conflict {
+				status.Staged.ConflictedFilesPaths = append(status.Staged.ConflictedFilesPaths, ConflictedFileStatus{
+					Filepath: stagedChange.GetPath(),
+					Message:  stagedChange.Conflict.Message,
+				})
+
+				if stagedChange.Conflict.ObjectName != fileHash {
+					status.WorkingDir.ModifiedFilePaths = append(status.WorkingDir.ModifiedFilePaths, filepath)
+				}
 			} else {
 				if savedFile == nil {
 					status.Staged.CreatedFilesPaths = append(status.Staged.CreatedFilesPaths, filepath)

@@ -27,11 +27,17 @@ type Log struct {
 	History []*SaveLog
 }
 
+type ConflictedFileStatus struct {
+	Filepath string
+	Message  string
+}
+
 type Status struct {
 	Staged struct {
-		CreatedFilesPaths []string
-		ModifiedFilePaths []string
-		RemovedFilePaths  []string
+		ConflictedFilesPaths []ConflictedFileStatus
+		CreatedFilesPaths    []string
+		ModifiedFilePaths    []string
+		RemovedFilePaths     []string
 	}
 	WorkingDir struct {
 		ModifiedFilePaths  []string
@@ -58,6 +64,16 @@ func CreateRepository(root string) *Repository {
 		index: []*directories.Change{},
 		dir:   directories.Dir{Path: root, Children: make(map[string]*directories.Node)},
 	}
+}
+
+func (status *Status) HasChanges() bool {
+	return len(status.Staged.ConflictedFilesPaths)+
+		len(status.Staged.CreatedFilesPaths)+
+		len(status.Staged.ModifiedFilePaths)+
+		len(status.Staged.RemovedFilePaths)+
+		len(status.WorkingDir.UntrackedFilePaths)+
+		len(status.WorkingDir.ModifiedFilePaths)+
+		len(status.WorkingDir.RemovedFilePaths) > 0
 }
 
 func GetRepository(root string) *Repository {
