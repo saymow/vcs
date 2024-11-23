@@ -127,12 +127,18 @@ func (fileSystem *FileSystem) SaveIndex(index []*directories.Change) {
 	errors.Check(err)
 
 	for _, change := range index {
-		if change.ChangeType == directories.Modification {
+
+		switch change.ChangeType {
+		case directories.Modification:
 			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.File.Filepath, directories.MODIFIED_CHANGE, change.File.ObjectName)))
-		} else if change.ChangeType == directories.Creation {
+		case directories.Creation:
 			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n%s\n", change.File.Filepath, directories.CREATED_CHANGE, change.File.ObjectName)))
-		} else {
+		case directories.Removal:
 			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\n", change.Removal.Filepath, directories.REMOVAL_CHANGE)))
+		case directories.Conflict:
+			_, err = file.Write([]byte(fmt.Sprintf("%s\t%s\t%s\n", change.Conflict.Filepath, directories.CONFLICT_CHANGE, change.Conflict.Message)))
+		default:
+			errors.Error("unreachable")
 		}
 		errors.Check(err)
 	}
@@ -150,26 +156,45 @@ func (fileSystem *FileSystem) parseIndex(file *os.File) []*directories.Change {
 		change := directories.Change{}
 
 		changeHeader := strings.Split(scanner.Text(), "\t")
+		changesHeaderLen := len(changeHeader)
 
-		if len(changeHeader) != 2 {
+		if changesHeaderLen < 2 || changesHeaderLen > 3 {
 			errors.Error("Invalid index format.")
 		}
 
-		if changeHeader[1] == directories.MODIFIED_CHANGE || changeHeader[1] == directories.CREATED_CHANGE {
-			if changeHeader[1] == directories.MODIFIED_CHANGE {
-				change.ChangeType = directories.Modification
-			} else {
-				change.ChangeType = directories.Creation
-			}
+		switch {
+		case changeHeader[1] == directories.MODIFIED_CHANGE || changeHeader[1] == directories.CREATED_CHANGE:
+			{
+				if changeHeader[1] == directories.MODIFIED_CHANGE {
+					change.ChangeType = directories.Modification
+				} else {
+					change.ChangeType = directories.Creation
+				}
 
-			change.File = &directories.File{}
-			change.File.Filepath = changeHeader[0]
-			scanner.Scan()
-			change.File.ObjectName = scanner.Text()
-		} else {
-			change.ChangeType = directories.Removal
-			change.Removal = &directories.FileRemoval{}
-			change.Removal.Filepath = changeHeader[0]
+				change.File = &directories.File{}
+				change.File.Filepath = changeHeader[0]
+				scanner.Scan()
+				change.File.ObjectName = scanner.Text()
+			}
+		case changeHeader[1] == directories.REMOVAL_CHANGE:
+			{
+				change.ChangeType = directories.Removal
+				change.Removal = &directories.FileRemoval{}
+				change.Removal.Filepath = changeHeader[0]
+			}
+		case changeHeader[1] == directories.CONFLICT_CHANGE:
+			{
+				if changesHeaderLen != 3 {
+					errors.Error("Invalid index format.")
+				}
+
+				change.ChangeType = directories.Conflict
+				change.Conflict = &directories.FileConflict{}
+				change.Conflict.Filepath = changeHeader[0]
+				change.Conflict.Message = changeHeader[2]
+				scanner.Scan()
+				change.Conflict.ObjectName = scanner.Text()
+			}
 		}
 
 		index = append(index, &change)
@@ -504,6 +529,34 @@ func (fileSystem *FileSystem) ReadSave(checkpointId string) *Save {
 	slices.Reverse(save.Checkpoints)
 
 	return save
+}
+
+func (fileSystem *FileSystem) ReadDirFile(file *directories.File) bytes.Buffer {
+	objectFile, err := os.Open(Path.Join(fileSystem.Root, REPOSITORY_FOLDER_NAME, OBJECTS_FOLDER_NAME, file.ObjectName))
+	errors.Check(err)
+	defer errors.CheckFn(objectFile.Close)
+
+	decompressor, err := gzip.NewReader(objectFile)
+	errors.Check(err)
+	defer errors.CheckFn(decompressor.Close)
+
+	var buffer bytes.Buffer
+	tmpBuffer := make([]byte, 128)
+
+	for {
+		n, err := decompressor.Read(tmpBuffer)
+
+		if err != nil && err != io.EOF {
+			errors.Error(err.Error())
+		}
+		if n == 0 {
+			break
+		}
+
+		buffer.Write(tmpBuffer[:n])
+	}
+
+	return buffer
 }
 
 func (fileSystem *FileSystem) createFile(file *directories.File) {

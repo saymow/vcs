@@ -2,6 +2,7 @@ package directories
 
 import (
 	Path "path/filepath"
+	"saymow/version-manager/app/pkg/errors"
 	"strings"
 )
 
@@ -104,13 +105,26 @@ func (change *Change) Conflicts(otherChange *Change) bool {
 
 func (root *Dir) addNodeHelper(segments []string, change *Change) {
 	if len(segments) == 1 {
-		if change.ChangeType == Removal {
+		switch {
+		case change.ChangeType == Removal:
 			delete(root.Children, segments[0])
-		} else {
+		case change.ChangeType == Creation || change.ChangeType == Modification:
 			root.Children[segments[0]] = &Node{
 				NodeType: FileType,
 				File:     change.File,
 			}
+		case change.ChangeType == Conflict:
+			{
+				root.Children[segments[0]] = &Node{
+					NodeType: FileType,
+					File: &File{
+						Filepath:   change.Conflict.Filepath,
+						ObjectName: change.Conflict.ObjectName,
+					},
+				}
+			}
+		default:
+			errors.Error("unreachable")
 		}
 
 		return

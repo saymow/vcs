@@ -12,6 +12,16 @@ func Map[T any, F any](slice []T, callback func(T, int) F) []F {
 	return newSlice
 }
 
+func ToMap[T any, F comparable](slice []T, callback func(T, int) F) map[F]T {
+	newMap := make(map[F]T)
+
+	for idx, element := range slice {
+		newMap[callback(element, idx)] = element
+	}
+
+	return newMap
+}
+
 func Filter[T any](slice []T, callback func(T, int) bool) []T {
 	newSlice := []T{}
 
