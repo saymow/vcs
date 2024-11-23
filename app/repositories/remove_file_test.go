@@ -111,3 +111,86 @@ func TestRemoveFile(t *testing.T) {
 		)
 	}
 }
+
+func TestRemoveConflictedFile(t *testing.T) {
+	dir, repository := fixtureGetCustomProject(t, fixtureMakeBasicRepositoryFs)
+	defer dir.Remove()
+
+	// to make it easier to test, index is updated in place
+
+	// Test temporary conflict object
+	{
+		// SETUP
+
+		// Save file in history
+
+		fixtures.WriteFile(dir.Join("a.txt"), []byte("content a."))
+
+		repository.IndexFile(dir.Join("a.txt"))
+		repository.SaveIndex()
+		repository.CreateSave("s0")
+
+		repository = GetRepository(dir.Path())
+
+		// Mock a merge conflict
+
+		tempObjectName := "cae2c9816a64843de42b6eaea3fd3f690e529e771d7491d8f409b7687960f82f"
+		fixtures.WriteFile(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, tempObjectName), []byte("x"))
+		fixtures.WriteFile(dir.Join("a.txt"), []byte("<ref>content a.</ref><incoming>content b.</incoming>"))
+
+		repository.index = []*directories.Change{
+			{
+				ChangeType: directories.Conflict,
+				Conflict: &directories.FileConflict{
+					Filepath:   dir.Join("a.txt"),
+					ObjectName: tempObjectName,
+					Message:    "Conflict.",
+				},
+			},
+		}
+		repository.SaveIndex()
+
+		// TEST
+
+		repository.RemoveFile(dir.Join("a.txt"))
+
+		assert.Equal(t, len(repository.index), 1)
+		assert.Equal(t, repository.index[0].ChangeType, directories.Removal)
+		assert.Equal(t, repository.index[0].Removal.Filepath, dir.Join("a.txt"))
+		assert.False(t, fixtures.FileExists(dir.Join("a.txt")))
+		assert.False(t, fixtures.FileExists(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, tempObjectName)))
+	}
+
+	// Test permanent conflict object (MUST NOT BE REMOVED)
+	{
+		// SETUP
+
+		// Mock a merge conflict
+
+		tempObjectName := "b221ff6068cbe899726392b3e24f71ca743107b2e986601fa94429835509f662"
+		fixtures.WriteFile(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, tempObjectName), []byte("x"))
+		fixtures.WriteFile(dir.Join("a.txt"), []byte("incoming content."))
+
+		repository.index = []*directories.Change{
+			{
+				ChangeType: directories.Conflict,
+				Conflict: &directories.FileConflict{
+					Filepath:   dir.Join("a.txt"),
+					ObjectName: tempObjectName,
+					Message:    "Removed at \"ref\" but modified at \"incoming\".",
+				},
+			},
+		}
+		repository.SaveIndex()
+
+		// TEST
+
+		repository.RemoveFile(dir.Join("a.txt"))
+
+		assert.Equal(t, len(repository.index), 1)
+		assert.Equal(t, repository.index[0].ChangeType, directories.Removal)
+		assert.Equal(t, repository.index[0].Removal.Filepath, dir.Join("a.txt"))
+		assert.False(t, fixtures.FileExists(dir.Join("a.txt")))
+		assert.True(t, fixtures.FileExists(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, tempObjectName)))
+	}
+}
