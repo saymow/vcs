@@ -70,6 +70,12 @@ func (err *DirError) Error() string {
 	return err.message
 }
 
+func (fileConflict *FileConflict) IsObjectTemporary() bool {
+	// If message is "Conflict.", then a temporary object is created to represent the conflicted file content.
+	// As soon as the conflict is resolved that object should be removed.
+	return fileConflict.Message == "Conflict."
+}
+
 func (change *Change) GetPath() string {
 	if change.ChangeType == Removal {
 		return change.Removal.Filepath

@@ -36,7 +36,7 @@ func (repository *Repository) IndexFile(filepath string) error {
 		// No changes at all
 
 		if stagedChangeIdx != -1 {
-			if repository.index[stagedChangeIdx].ChangeType != directories.Removal {
+			if repository.index[stagedChangeIdx].GetHash() != object.ObjectName {
 				// Remove change file object
 				repository.fs.RemoveObject(repository.index[stagedChangeIdx].File.ObjectName)
 			}
@@ -45,10 +45,19 @@ func (repository *Repository) IndexFile(filepath string) error {
 			repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
 		}
 	} else if stagedChangeIdx != -1 {
-		if repository.index[stagedChangeIdx].ChangeType != directories.Removal &&
-			repository.index[stagedChangeIdx].File.ObjectName != object.ObjectName {
+		stagedChange := repository.index[stagedChangeIdx]
+
+		if stagedChange.ChangeType == directories.Conflict &&
+			stagedChange.GetHash() != object.ObjectName &&
+			stagedChange.Conflict.IsObjectTemporary() {
+			// Remove conflicted temp file object
+			repository.fs.RemoveObject(stagedChange.GetHash())
+		}
+
+		if (stagedChange.ChangeType == directories.Creation || stagedChange.ChangeType == directories.Modification) &&
+			stagedChange.GetHash() != object.ObjectName {
 			// Remove change file object
-			repository.fs.RemoveObject(repository.index[stagedChangeIdx].File.ObjectName)
+			repository.fs.RemoveObject(stagedChange.GetHash())
 		}
 
 		// Undo index existing change
