@@ -12,6 +12,9 @@ func (repository *Repository) CreateSave(message string) (*filesystems.Checkpoin
 	if len(repository.index) == 0 {
 		return nil, &ValidationError{"cannot save empty index."}
 	}
+	if repository.isIndexConflicted() {
+		return nil, &ValidationError{"index is conflicted."}
+	}
 
 	save := filesystems.Checkpoint{
 		Message:   message,

@@ -122,6 +122,14 @@ func (repository *Repository) setHead(newHead string) {
 	repository.fs.WriteHead(repository.head)
 }
 
+func (repository *Repository) isIndexConflicted() bool {
+	idx := collections.FindIndex(repository.index, func(change *directories.Change, _ int) bool {
+		return change.ChangeType == directories.Conflict
+	})
+
+	return idx != -1
+}
+
 func (repository *Repository) findStagedChangeIdx(filepath string) int {
 	return collections.FindIndex(repository.index, func(change *directories.Change, _ int) bool {
 		return change.GetPath() == filepath
