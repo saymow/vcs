@@ -22,7 +22,7 @@ type BaseRepositoryMeta struct {
 }
 
 func makeBaseRepository(t *testing.T) (*fs.Dir, *Repository, *BaseRepositoryMeta) {
-	dir, repository := fixtureNewProject(t)
+	dir, repository := fixtureGetNewProject(t)
 
 	fixtures.WriteFile(dir.Join("a.txt"), []byte("a.txt content."))
 	fixtures.WriteFile(dir.Join("b.txt"), []byte("b.txt content."))

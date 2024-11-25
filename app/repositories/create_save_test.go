@@ -55,7 +55,7 @@ func TestInvalidCreateSave(t *testing.T) {
 			ChangeType: directories.Conflict,
 			Conflict: &directories.FileConflict{
 				Filepath:   "b.txt",
-				ObjectName: "definetely-not-a-hash",
+				ObjectName: "definitely-not-a-hash",
 				Message:    "Conflict.",
 			},
 		},

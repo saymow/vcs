@@ -227,7 +227,7 @@ func TestIndexFileComplexCases(t *testing.T) {
 }
 
 func TestIndexConflictedFile(t *testing.T) {
-	dir, repository := fixtureNewProject(t)
+	dir, repository := fixtureGetNewProject(t)
 
 	// to make it easier to test, index is updated in place
 
@@ -311,7 +311,7 @@ func TestIndexConflictedFile(t *testing.T) {
 		repository.SaveIndex()
 
 		// TEST
-		fixtures.WriteFile(dir.Join("a.txt"), []byte("definetely the hash is going to change."))
+		fixtures.WriteFile(dir.Join("a.txt"), []byte("definitely the hash is going to change."))
 		repository.IndexFile(dir.Join("a.txt"))
 
 		assert.Equal(t, len(repository.index), 1)

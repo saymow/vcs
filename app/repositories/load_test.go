@@ -26,7 +26,7 @@ func TestInvalidLoad(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	dir, repository := fixtureNewProject(t)
+	dir, repository := fixtureGetNewProject(t)
 	defer dir.Remove()
 
 	// Setup

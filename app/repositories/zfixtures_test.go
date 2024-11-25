@@ -89,7 +89,7 @@ func fixtureGetBaseProject(t *testing.T) (*fs.Dir, *Repository) {
 	return dir, CreateRepository(dir.Path())
 }
 
-func fixtureNewProject(t *testing.T) (*fs.Dir, *Repository) {
+func fixtureGetNewProject(t *testing.T) (*fs.Dir, *Repository) {
 	dir := fs.NewDir(
 		t,
 		"project",

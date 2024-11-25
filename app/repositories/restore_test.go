@@ -1,8 +1,12 @@
 package repositories
 
 import (
+	"bytes"
+	"compress/gzip"
 	path "path/filepath"
+	"saymow/version-manager/app/pkg/errors"
 	"saymow/version-manager/app/pkg/fixtures"
+	"saymow/version-manager/app/repositories/directories"
 	"saymow/version-manager/app/repositories/filesystems"
 	"testing"
 
@@ -244,6 +248,80 @@ func TestRestoreHeadNoHistory(t *testing.T) {
 
 }
 
+func gzipHelper(content []byte) []byte {
+	var buffer bytes.Buffer
+
+	w := gzip.NewWriter(&buffer)
+	_, err := w.Write(content)
+	errors.Check(err)
+	w.Close()
+
+	return buffer.Bytes()
+}
+
+func TestRestoreConflictedIndexHead(t *testing.T) {
+	dir, repository := fixtureGetNewProject(t)
+	defer dir.Remove()
+
+	// to make it easier to test, index is updated in place
+
+	// Setup
+
+	permanentObjectName := "e9ff35841bff8f33a8e03e3fff32826c9600227c129945f56414a45754f17004"
+	tempObjectName := "982ef2114c56ce40c6391efe12cc5b9e9347925af3de119111293033c2e77129"
+
+	fixtures.WriteFile(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, permanentObjectName), gzipHelper([]byte("content a.")))
+	fixtures.WriteFile(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.OBJECTS_FOLDER_NAME, tempObjectName), gzipHelper([]byte("content b.")))
+
+	fixtures.WriteFile(dir.Join("a.txt"), []byte("content a."))
+	fixtures.WriteFile(dir.Join("b.txt"), []byte("content b."))
+
+	repository.index = []*directories.Change{
+		{
+			ChangeType: directories.Conflict,
+			Conflict: &directories.FileConflict{
+				Filepath:   dir.Join("a.txt"),
+				ObjectName: permanentObjectName,
+				Message:    "Remoted at \"x\" but modified at \"y\".",
+			},
+		},
+		{
+			ChangeType: directories.Conflict,
+			Conflict: &directories.FileConflict{
+				Filepath:   dir.Join("b.txt"),
+				ObjectName: tempObjectName,
+				Message:    "Conflict.",
+			},
+		},
+	}
+
+	fixtures.WriteFile(dir.Join("a.txt"), []byte("definitely not the content a."))
+	fixtures.WriteFile(dir.Join("b.txt"), []byte("definitely not the content b."))
+
+	repository.Restore("HEAD", ".")
+
+	assert.Equal(t, len(repository.index), 0)
+	fsAssert.Assert(
+		t,
+		fs.Equal(
+			dir.Path(),
+			fs.Expected(
+				t,
+				fs.WithDir(
+					filesystems.REPOSITORY_FOLDER_NAME,
+					fs.WithDir(
+						filesystems.OBJECTS_FOLDER_NAME,
+						fs.WithFile(permanentObjectName, string(gzipHelper([]byte("content a.")))),
+					),
+					fs.MatchExtraFiles,
+				),
+				fs.WithFile("a.txt", "content a."),
+				fs.WithFile("b.txt", "content b."),
+			),
+		),
+	)
+}
+
 func TestRestoreHistoryUnsavedChangesRootDir(t *testing.T) {
 	dir, repository := fixtureGetBaseProject(t)
 	defer dir.Remove()
@@ -333,7 +411,7 @@ func TestRestoreHistoryUnsavedChangesRootDir(t *testing.T) {
 }
 
 func TestRestoreHistoryUnsavedChangesSubdir(t *testing.T) {
-	dir, repository := fixtureNewProject(t)
+	dir, repository := fixtureGetNewProject(t)
 	defer dir.Remove()
 	var save0 *filesystems.Checkpoint
 
@@ -457,7 +535,7 @@ func TestRestoreHistoryUnsavedChangesSubdir(t *testing.T) {
 }
 
 func TestRestoreHistoryFileUnsavedChanges(t *testing.T) {
-	dir, repository := fixtureNewProject(t)
+	dir, repository := fixtureGetNewProject(t)
 	defer dir.Remove()
 	var save *filesystems.Checkpoint
 

@@ -58,11 +58,11 @@ func TestGetStatus(t *testing.T) {
 			Conflict: &directories.FileConflict{
 				Filepath:   dir.Join("1.txt"),
 				Message:    "Conflict.",
-				ObjectName: "definetely-not-a-real-hash",
+				ObjectName: "definitely-not-a-real-hash",
 			},
 		})
 
-		fixtures.WriteFile(dir.Join("1.txt"), []byte("it is definetely gonna fix the conflict."))
+		fixtures.WriteFile(dir.Join("1.txt"), []byte("it is definitely gonna fix the conflict."))
 
 		status := repository.GetStatus()
 
