@@ -465,6 +465,230 @@ func TestPreOrderTraversal(t *testing.T) {
 	)
 }
 
+func TestMerge(t *testing.T) {
+	// unmodified
+	{
+		dir := &Dir{
+			Path: Path.Join(getOsRoot(), "home", "project"),
+			Children: map[string]*Node{
+				"a.txt": {
+					NodeType: FileType,
+					File: &File{
+						"home/project/a.txt",
+						"object-a",
+					},
+				},
+				"b.txt": {
+					NodeType: FileType,
+					File: &File{
+						"home/project/b.txt",
+						"object-b",
+					},
+				},
+			},
+		}
+
+		dir.Merge(&Dir{
+			Path: Path.Join(getOsRoot(), "home"),
+			Children: map[string]*Node{
+				"a.txt": {
+					NodeType: FileType,
+					File: &File{
+						"home/a.txt",
+						"object-a",
+					},
+				},
+				"b.txt": {
+					NodeType: FileType,
+					File: &File{
+						"home/b.txt",
+						"object-b",
+					},
+				},
+			},
+		})
+
+		assert.Equal(t, dir.Path, Path.Join(getOsRoot(), "home", "project"))
+		assert.Equal(t, len(dir.Children), 2)
+		assert.Equal(t, dir.Children["a.txt"].File, &File{Filepath: "home/project/a.txt", ObjectName: "object-a"})
+		assert.Equal(t, dir.Children["b.txt"].File, &File{Filepath: "home/project/b.txt", ObjectName: "object-b"})
+	}
+
+	// add nodes
+	{
+		dir := &Dir{
+			Path: Path.Join(getOsRoot(), "home", "project"),
+			Children: map[string]*Node{
+				"a.txt": {
+					NodeType: FileType,
+					File: &File{
+						Path.Join(getOsRoot(), "home", "project", "a.txt"),
+						"object-a",
+					},
+				},
+				"b.txt": {
+					NodeType: FileType,
+					File: &File{
+						Path.Join(getOsRoot(), "home", "project", "b.txt"),
+						"object-b",
+					},
+				},
+			},
+		}
+
+		dir.Merge(&Dir{
+			Path: Path.Join(getOsRoot(), "home"),
+			Children: map[string]*Node{
+				"a.txt": {
+					NodeType: FileType,
+					File: &File{
+						Path.Join(getOsRoot(), "home", "a.txt"),
+						"object-a",
+					},
+				},
+				"b.txt": {
+					NodeType: FileType,
+					File: &File{
+						Path.Join(getOsRoot(), "home", "b.txt"),
+						"object-b",
+					},
+				},
+				"project": {
+					NodeType: DirType,
+					Dir: &Dir{
+						Path: Path.Join(getOsRoot(), "home", "project"),
+						Children: map[string]*Node{
+							"c.txt": {
+								NodeType: FileType,
+								File: &File{
+									Path.Join(getOsRoot(), "home", "project", "c.txt"),
+									"object-c",
+								},
+							},
+							"d.txt": {
+								NodeType: FileType,
+								File: &File{
+									Path.Join(getOsRoot(), "home", "project", "d.txt"),
+									"object-d",
+								},
+							},
+							"folder": {
+								NodeType: DirType,
+								Dir: &Dir{
+									Path: Path.Join(getOsRoot(), "home", "project", "folder"),
+									Children: map[string]*Node{
+										"a.txt": {
+											NodeType: FileType,
+											File: &File{
+												Path.Join(getOsRoot(), "home", "project", "folder", "a.txt"),
+												"object-a",
+											},
+										},
+										"b.txt": {
+											NodeType: FileType,
+											File: &File{
+												Path.Join(getOsRoot(), "home", "project", "folder", "b.txt"),
+												"object-b",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		assert.Equal(t, dir.Path, Path.Join(getOsRoot(), "home", "project"))
+		assert.Equal(t, len(dir.Children), 5)
+		assert.Equal(t, dir.Children["a.txt"].File, &File{Filepath: Path.Join(getOsRoot(), "home", "project", "a.txt"), ObjectName: "object-a"})
+		assert.Equal(t, dir.Children["b.txt"].File, &File{Filepath: Path.Join(getOsRoot(), "home", "project", "b.txt"), ObjectName: "object-b"})
+		assert.Equal(t, dir.Children["c.txt"].File, &File{Filepath: Path.Join(getOsRoot(), "home", "project", "c.txt"), ObjectName: "object-c"})
+		assert.Equal(t, dir.Children["d.txt"].File, &File{Filepath: Path.Join(getOsRoot(), "home", "project", "d.txt"), ObjectName: "object-d"})
+		assert.Equal(t, dir.Children["folder"].NodeType, DirType)
+		assert.Equal(t, dir.Children["folder"].Dir.Path, Path.Join(getOsRoot(), "home", "project", "folder"))
+		assert.Equal(t, len(dir.Children["folder"].Dir.Children), 2)
+		assert.Equal(t, dir.Children["folder"].Dir.Children["a.txt"].File, &File{Filepath: Path.Join(getOsRoot(), "home", "project", "folder", "a.txt"), ObjectName: "object-a"})
+		assert.Equal(t, dir.Children["folder"].Dir.Children["b.txt"].File, &File{Filepath: Path.Join(getOsRoot(), "home", "project", "folder", "b.txt"), ObjectName: "object-b"})
+	}
+
+	// add and override nodes
+	{
+		dir := &Dir{
+			Path: Path.Join(getOsRoot(), "home", "project"),
+			Children: map[string]*Node{
+				"a.txt": {
+					NodeType: FileType,
+					File: &File{
+						Path.Join(getOsRoot(), "home", "project", "a.txt"),
+						"object-a",
+					},
+				},
+				"b.txt": {
+					NodeType: FileType,
+					File: &File{
+						Path.Join(getOsRoot(), "home", "project", "b.txt"),
+						"object-b",
+					},
+				},
+			},
+		}
+
+		dir.Merge(&Dir{
+			Path: Path.Join(getOsRoot(), "home", "project"),
+			Children: map[string]*Node{
+				"a.txt": {
+					NodeType: FileType,
+					File: &File{
+						Path.Join(getOsRoot(), "home", "project", "a.txt"),
+						"object-a-overridden",
+					},
+				},
+				"b.txt": {
+					NodeType: FileType,
+					File: &File{
+						Path.Join(getOsRoot(), "home", "project", "b.txt"),
+						"object-b-overridden",
+					},
+				},
+				"folder": {
+					NodeType: DirType,
+					Dir: &Dir{
+						Path: Path.Join(getOsRoot(), "home", "project", "folder"),
+						Children: map[string]*Node{
+							"a.txt": {
+								NodeType: FileType,
+								File: &File{
+									Path.Join(getOsRoot(), "home", "project", "folder", "a.txt"),
+									"object-a",
+								},
+							},
+							"b.txt": {
+								NodeType: FileType,
+								File: &File{
+									Path.Join(getOsRoot(), "home", "project", "folder", "b.txt"),
+									"object-b",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		assert.Equal(t, dir.Path, Path.Join(getOsRoot(), "home", "project"))
+		assert.Equal(t, len(dir.Children), 3)
+		assert.Equal(t, dir.Children["a.txt"].File, &File{Filepath: Path.Join(getOsRoot(), "home", "project", "a.txt"), ObjectName: "object-a-overridden"})
+		assert.Equal(t, dir.Children["b.txt"].File, &File{Filepath: Path.Join(getOsRoot(), "home", "project", "b.txt"), ObjectName: "object-b-overridden"})
+		assert.Equal(t, dir.Children["folder"].NodeType, DirType)
+		assert.Equal(t, dir.Children["folder"].Dir.Path, Path.Join(getOsRoot(), "home", "project", "folder"))
+		assert.Equal(t, len(dir.Children["folder"].Dir.Children), 2)
+		assert.Equal(t, dir.Children["folder"].Dir.Children["a.txt"].File, &File{Filepath: Path.Join(getOsRoot(), "home", "project", "folder", "a.txt"), ObjectName: "object-a"})
+		assert.Equal(t, dir.Children["folder"].Dir.Children["b.txt"].File, &File{Filepath: Path.Join(getOsRoot(), "home", "project", "folder", "b.txt"), ObjectName: "object-b"})
+	}
+}
+
 func getOsRoot() string {
 	if runtime.GOOS == "windows" {
 		return "C:\\"
