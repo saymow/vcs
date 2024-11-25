@@ -233,7 +233,7 @@ func (root *Dir) PreOrderTraversal() []*Node {
 	return nodes
 }
 
-func (root *Dir) isSubpath(path string) bool {
+func (root *Dir) IsSubpath(path string) bool {
 	rootParts := strings.Split(root.Path, string((Path.Separator)))
 	parts := strings.Split(path, string((Path.Separator)))
 
@@ -269,16 +269,16 @@ func (root *Dir) AbsPath(path string) (string, error) {
 	if !Path.IsAbs(path) {
 		path = Path.Join(root.Path, path)
 	}
-	if !root.isSubpath(path) {
+	if !root.IsSubpath(path) {
 		return "", &DirError{"invalid path."}
 	}
 
 	return path, nil
 }
 
-func (root *Dir) Merge(dir *Dir) {
+func (root *Dir) Merge(dir *Dir) *Dir {
 	for _, node := range dir.CollectAllFiles() {
-		if !root.isSubpath(node.Filepath) || node.Filepath == root.Path {
+		if !root.IsSubpath(node.Filepath) || node.Filepath == root.Path {
 			continue
 		}
 		normalzedPath, err := root.NormalizePath(node.Filepath)
@@ -289,4 +289,6 @@ func (root *Dir) Merge(dir *Dir) {
 			ObjectName: node.ObjectName,
 		}})
 	}
+
+	return root
 }

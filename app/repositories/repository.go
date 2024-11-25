@@ -96,6 +96,10 @@ func (repository *Repository) getCurrentSaveName() string {
 	return (*repository.refs)[repository.head]
 }
 
+func (repository *Repository) hasEmptySaveHistory() bool {
+	return repository.getCurrentSaveName() == ""
+}
+
 func (repository *Repository) isDetachedMode() bool {
 	if _, ok := (*repository.refs)[repository.head]; ok {
 		// Then head is a reference
@@ -158,16 +162,13 @@ func (repository *Repository) findSavedFile(filepath string) *directories.File {
 }
 
 func (repository *Repository) getSave(ref string) *filesystems.Save {
+	if repository.hasEmptySaveHistory() {
+		return nil
+	}
 	if ref == "" {
 		return nil
 	}
-	if ref == filesystems.INITIAL_REF_NAME {
-		if saveName, ok := (*repository.refs)[ref]; ok && saveName == "" {
-			// This is expect to only happen for repositories with not saves
 
-			return nil
-		}
-	}
 	if ref == "HEAD" {
 		ref = repository.head
 	}

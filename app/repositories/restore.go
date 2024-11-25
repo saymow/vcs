@@ -5,8 +5,25 @@ import (
 	"saymow/version-manager/app/pkg/errors"
 	"saymow/version-manager/app/repositories/directories"
 	"slices"
-	"strings"
 )
+
+func (repository *Repository) getIndexDir() *directories.Node {
+	dir := directories.Dir{
+		Path:     repository.fs.Root,
+		Children: make(map[string]*directories.Node),
+	}
+
+	for _, change := range repository.index {
+		if change.ChangeType != directories.Removal {
+			normalizedPath, err := dir.NormalizePath(change.GetPath())
+			errors.Check(err)
+
+			dir.AddNode(normalizedPath, change)
+		}
+	}
+
+	return &directories.Node{NodeType: directories.DirType, Dir: &dir}
+}
 
 // Restore cover 2 usecases:
 //
@@ -32,69 +49,69 @@ func (repository *Repository) Restore(ref string, path string) error {
 		return err
 	}
 
-	save := repository.getSave(ref)
-	if save == nil {
-		return &ValidationError{"invalid ref."}
+	var node *directories.Node
+
+	if repository.hasEmptySaveHistory() {
+		node = repository.getIndexDir().Dir.FindNode(resolvedPath)
+	} else {
+		save := repository.getSave(ref)
+
+		if save == nil {
+			return &ValidationError{"invalid ref."}
+		}
+
+		dir := buildDir(repository.fs.Root, save)
+
+		if ref == "HEAD" {
+			dir.Merge(repository.getIndexDir().Dir)
+		}
+
+		node = dir.FindNode(resolvedPath)
 	}
 
-	node := buildDir(repository.fs.Root, save).FindNode(resolvedPath)
 	if node == nil {
 		return &ValidationError{"invalid path."}
 	}
 
 	filesRemovedFromIndex := []*directories.File{}
 
-	if node.NodeType == directories.FileType {
-		// Check if there is a index modification for the node
-		stagedChangeIdx := repository.findStagedChangeIdx(node.File.Filepath)
+	if ref == "HEAD" {
+		// Should correctly cleanup applied  index changes
 
-		if stagedChangeIdx != -1 {
-			// If so, remove the change from the index
+		if node.NodeType == directories.FileType {
+			// Check if there is a index modification for the node
+			stagedChangeIdx := repository.findStagedChangeIdx(node.File.Filepath)
 
-			if repository.index[stagedChangeIdx].ChangeType != directories.Removal {
-				// If it is a file modification, should also remove its object
+			if stagedChangeIdx != -1 {
+				// If defined, we are restoring the index change
 
-				if ref == "HEAD" {
-					// If restoring to HEAD, index is a priority
-
-					node = &directories.Node{NodeType: directories.FileType, File: repository.index[stagedChangeIdx].File}
+				if repository.index[stagedChangeIdx].ChangeType != directories.Removal {
+					// Should remove the object
+					filesRemovedFromIndex = append(filesRemovedFromIndex, repository.index[stagedChangeIdx].File)
 				}
 
-				filesRemovedFromIndex = append(filesRemovedFromIndex, repository.index[stagedChangeIdx].File)
+				repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
 			}
+		} else {
+			// For directories we should iterate over the index and remove entries contained in that dir
 
-			repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
+			repository.index = collections.Filter(repository.index, func(change *directories.Change, _ int) bool {
+				if !node.Dir.IsSubpath(change.GetPath()) {
+					// If index change is in other directory, keep index change
+
+					return true
+				}
+
+				// Otherwise, we are restoring the index change
+
+				if change.ChangeType != directories.Removal {
+					// Should remove change object
+					filesRemovedFromIndex = append(filesRemovedFromIndex, change.File)
+				}
+
+				return false
+			})
 		}
-	} else {
-		// For directories we should iterate over the index and rebuild the node dir, if necessary,
-		// applying the index priority.
-
-		repository.index = collections.Filter(repository.index, func(change *directories.Change, _ int) bool {
-			filepath := change.GetPath()
-
-			if !strings.HasPrefix(filepath, node.Dir.Path) {
-				// If index change is in other directory, keep file
-
-				return true
-			}
-
-			if change.ChangeType != directories.Removal {
-				// If it is a file modification, should also remove its object
-
-				if ref == "HEAD" {
-					// If restoring to HEAD, index is a priority
-
-					normalizedPath, err := node.Dir.NormalizePath(filepath)
-					errors.Check(err)
-
-					node.Dir.AddNode(normalizedPath, change)
-				}
-
-				filesRemovedFromIndex = append(filesRemovedFromIndex, change.File)
-			}
-
-			return false
-		})
 	}
 
 	if node.NodeType == directories.DirType {
