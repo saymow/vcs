@@ -275,3 +275,18 @@ func (root *Dir) AbsPath(path string) (string, error) {
 
 	return path, nil
 }
+
+func (root *Dir) Merge(dir *Dir) {
+	for _, node := range dir.CollectAllFiles() {
+		if !root.isSubpath(node.Filepath) || node.Filepath == root.Path {
+			continue
+		}
+		normalzedPath, err := root.NormalizePath(node.Filepath)
+		errors.Check(err)
+
+		root.AddNode(normalzedPath, &Change{ChangeType: Creation, File: &File{
+			Filepath:   node.Filepath,
+			ObjectName: node.ObjectName,
+		}})
+	}
+}
