@@ -85,9 +85,15 @@ func (repository *Repository) Restore(ref string, path string) error {
 			if stagedChangeIdx != -1 {
 				// If defined, we are restoring the index change
 
-				if repository.index[stagedChangeIdx].ChangeType != directories.Removal {
-					// Should remove the object
+				switch {
+				// Should remove the object
+				case repository.index[stagedChangeIdx].ChangeType == directories.Creation || repository.index[stagedChangeIdx].ChangeType == directories.Modification:
 					filesRemovedFromIndex = append(filesRemovedFromIndex, repository.index[stagedChangeIdx].File)
+				case repository.index[stagedChangeIdx].ChangeType == directories.Conflict && repository.index[stagedChangeIdx].Conflict.IsObjectTemporary():
+					filesRemovedFromIndex = append(filesRemovedFromIndex, &directories.File{
+						Filepath:   repository.index[stagedChangeIdx].Conflict.Filepath,
+						ObjectName: repository.index[stagedChangeIdx].Conflict.ObjectName,
+					})
 				}
 
 				repository.index = slices.Delete(repository.index, stagedChangeIdx, stagedChangeIdx+1)
@@ -104,9 +110,15 @@ func (repository *Repository) Restore(ref string, path string) error {
 
 				// Otherwise, we are restoring the index change
 
-				if change.ChangeType != directories.Removal {
-					// Should remove change object
+				switch {
+				// Should remove the object
+				case change.ChangeType == directories.Creation || change.ChangeType == directories.Modification:
 					filesRemovedFromIndex = append(filesRemovedFromIndex, change.File)
+				case change.ChangeType == directories.Conflict && change.Conflict.IsObjectTemporary():
+					filesRemovedFromIndex = append(filesRemovedFromIndex, &directories.File{
+						Filepath:   change.Conflict.Filepath,
+						ObjectName: change.Conflict.ObjectName,
+					})
 				}
 
 				return false
