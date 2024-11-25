@@ -2,9 +2,7 @@ package repositories
 
 import (
 	path "path/filepath"
-	"saymow/version-manager/app/pkg/collections"
 	"saymow/version-manager/app/pkg/fixtures"
-	"saymow/version-manager/app/repositories/directories"
 	"saymow/version-manager/app/repositories/filesystems"
 	"testing"
 
@@ -208,225 +206,254 @@ func TestRestoreHeadDir(t *testing.T) {
 	}
 }
 
-func TestRestoreHistoryUnsavedChanges(t *testing.T) {
+func TestRestoreHeadNoHistory(t *testing.T) {
+	dir, repository := fixtureGetBaseProject(t)
+	defer dir.Remove()
+
+	// SETUP
+
+	repository.IndexFile(dir.Join("1.txt"))
+	repository.IndexFile(dir.Join("2.txt"))
+	repository.IndexFile(dir.Join("a", "4.txt"))
+	repository.SaveIndex()
+
+	fixtures.WriteFile(dir.Join("1.txt"), []byte("1 updated content"))
+	fixtures.WriteFile(dir.Join("2.txt"), []byte("2 updated content"))
+	fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("4 updated content"))
+
+	repository = GetRepository(dir.Path())
+
+	repository.Restore("HEAD", ".")
+
+	fsAssert.Assert(
+		t,
+		fs.Equal(
+			dir.Path(),
+			fs.Expected(
+				t,
+				fs.WithDir(filesystems.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+				fs.WithFile("1.txt", "1 content"),
+				fs.WithFile("2.txt", "2 content"),
+				fs.WithDir(
+					"a",
+					fs.WithFile("4.txt", "4 content"),
+				),
+			),
+		),
+	)
+
+}
+
+func TestRestoreHistoryUnsavedChangesRootDir(t *testing.T) {
 	dir, repository := fixtureGetBaseProject(t)
 	defer dir.Remove()
 	var save *filesystems.Checkpoint
 
-	// Root dir
+	// Setup
 	{
-		// Setup
+		// SAVE 0
 		{
-			// SAVE 0
-			{
-				fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
 
-				repository.IndexFile(dir.Join("1.txt"))
-				repository.IndexFile(dir.Join("2.txt"))
-				repository.IndexFile(dir.Join("a", "4.txt"))
-				repository.IndexFile(dir.Join("a", "b", "6.txt"))
-				repository.IndexFile(dir.Join("c", "8.txt"))
-				repository.SaveIndex()
-				save, _ = repository.CreateSave("SAVE 0")
-			}
+			repository.IndexFile(dir.Join("1.txt"))
+			repository.IndexFile(dir.Join("2.txt"))
+			repository.IndexFile(dir.Join("a", "4.txt"))
+			repository.IndexFile(dir.Join("a", "b", "6.txt"))
+			repository.IndexFile(dir.Join("c", "8.txt"))
+			repository.SaveIndex()
+			save, _ = repository.CreateSave("SAVE 0")
+		}
 
-			// SAVE 1
-			{
-				repository = GetRepository(dir.Path())
+		// SAVE 1
+		{
+			repository = GetRepository(dir.Path())
 
-				fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0) (SAVE 1)."))
-				fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1)."))
-				repository.IndexFile(dir.Join("1.txt"))
-				repository.IndexFile(dir.Join("2.txt"))
-				repository.SaveIndex()
-				repository.CreateSave("SAVE 1")
-			}
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0) (SAVE 1)."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1)."))
+			repository.IndexFile(dir.Join("1.txt"))
+			repository.IndexFile(dir.Join("2.txt"))
+			repository.SaveIndex()
+			repository.CreateSave("SAVE 1")
+		}
 
+		// create
+		fixtures.WriteFile(dir.Join("9.txt"), []byte("new file content."))
+		fixtures.WriteFile(dir.Join("10.txt"), []byte("new file content."))
+
+		// update
+		fixtures.WriteFile(dir.Join("1.txt"), []byte("file updated content."))
+		fixtures.WriteFile(dir.Join("2.txt"), []byte("file updated content."))
+
+		// delete
+		fixtures.RemoveFile(dir.Join("c", "8.txt"))
+
+		repository = GetRepository(dir.Path())
+
+		repository.IndexFile(dir.Join("9.txt"))
+		repository.IndexFile(dir.Join("2.txt"))
+		repository.RemoveFile(dir.Join("a", "4.txt"))
+		repository.SaveIndex()
+	}
+
+	// Test Save
+	{
+		repository = GetRepository(dir.Path())
+		repository.Restore(save.Id, ".")
+
+		repository = GetRepository(dir.Path())
+
+		fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
+		// should keep index changes, since we are not restoring HEAD.
+		fsAssert.Equal(t, len(repository.index), 3)
+		fsAssert.Assert(
+			t,
+			fs.Equal(
+				dir.Path(),
+				fs.Expected(
+					t,
+					fs.WithDir(filesystems.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+					fs.WithFile("1.txt", "file 1 (SAVE 0)."),
+					fs.WithFile("2.txt", "file 2 (SAVE 0)."),
+					fs.WithDir(
+						"a",
+						fs.WithFile("4.txt", "file 4 (SAVE 0)."),
+						fs.WithDir("b",
+							fs.WithFile("6.txt", "file 6 (SAVE 0)."),
+						)),
+					fs.WithDir("c", fs.WithFile("8.txt", "file 8 (SAVE 0).")),
+				),
+			),
+		)
+	}
+
+}
+
+func TestRestoreHistoryUnsavedChangesSubdir(t *testing.T) {
+	dir, repository := fixtureNewProject(t)
+	defer dir.Remove()
+	var save0 *filesystems.Checkpoint
+
+	// Setup
+	{
+		// SAVE 0
+		{
+			fixtures.WriteFile(dir.Join("0.txt"), []byte("file 0 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0)."))
+			fixtures.MakeDirs(dir.Join("c"))
+			fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
+			fixtures.MakeDirs(dir.Join("a"), dir.Join("a", "b"))
+			fixtures.WriteFile(dir.Join("a", "3.txt"), []byte("file 3 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("a", "5.txt"), []byte("file 5 (SAVE 0)."))
+			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
+
+			repository.IndexFile(dir.Join("0.txt"))
+			repository.IndexFile(dir.Join("1.txt"))
+			repository.IndexFile(dir.Join("2.txt"))
+			repository.IndexFile(dir.Join("a", "3.txt"))
+			repository.IndexFile(dir.Join("a", "4.txt"))
+			repository.IndexFile(dir.Join("a", "5.txt"))
+			repository.IndexFile(dir.Join("a", "b", "6.txt"))
+			repository.IndexFile(dir.Join("c", "8.txt"))
+			repository.SaveIndex()
+			save0, _ = repository.CreateSave("SAVE 0")
+		}
+
+		// SAVE 1
+		{
+			repository = GetRepository(dir.Path())
+
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0) (SAVE 1)."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1)."))
+			repository.IndexFile(dir.Join("1.txt"))
+			repository.IndexFile(dir.Join("2.txt"))
+			repository.SaveIndex()
+			repository.CreateSave("SAVE 1")
+		}
+
+		// Changes outside of "a" dir
+
+		{
 			// create
-			fixtures.WriteFile(dir.Join("9.txt"), []byte("new file content."))
-			fixtures.WriteFile(dir.Join("10.txt"), []byte("new file content."))
+			fixtures.WriteFile(dir.Join("9.txt"), []byte("new file 9 content."))
+			fixtures.WriteFile(dir.Join("10.txt"), []byte("new file 10 content."))
 
 			// update
-			fixtures.WriteFile(dir.Join("1.txt"), []byte("file updated content."))
-			fixtures.WriteFile(dir.Join("2.txt"), []byte("file updated content."))
+			fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 updated content."))
+			fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 updated content."))
 
 			// delete
 			fixtures.RemoveFile(dir.Join("c", "8.txt"))
-
-			repository = GetRepository(dir.Path())
-
-			repository.IndexFile(dir.Join("9.txt"))
-			repository.IndexFile(dir.Join("2.txt"))
-			repository.RemoveFile(dir.Join("a", "4.txt"))
-			repository.SaveIndex()
 		}
 
-		// Test Save
+		// Changes inside "a" dir
+
 		{
-			repository = GetRepository(dir.Path())
-			repository.Restore(save.Id, ".")
+			// create
+			fixtures.WriteFile(dir.Join("a", "11.txt"), []byte("new file 11 content."))
+			fixtures.WriteFile(dir.Join("a", "12.txt"), []byte("new file 12 content."))
 
-			repository = GetRepository(dir.Path())
+			// update
+			fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 updated content."))
+			fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
 
-			fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
-			fsAssert.Equal(t, len(repository.index), 0)
-			fsAssert.Assert(
-				t,
-				fs.Equal(
-					dir.Path(),
-					fs.Expected(
-						t,
-						fs.WithDir(filesystems.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
-						fs.WithFile("1.txt", "file 1 (SAVE 0)."),
-						fs.WithFile("2.txt", "file 2 (SAVE 0)."),
-						fs.WithDir(
-							"a",
-							fs.WithFile("4.txt", "file 4 (SAVE 0)."),
-							fs.WithDir("b",
-								fs.WithFile("6.txt", "file 6 (SAVE 0)."),
-							)),
-						fs.WithDir("c", fs.WithFile("8.txt", "file 8 (SAVE 0).")),
-					),
-				),
-			)
+			// delete
+			fixtures.RemoveFile(dir.Join("a", "5.txt"))
 		}
+
+		// Apply index
+		repository = GetRepository(dir.Path())
+
+		repository.IndexFile(dir.Join("9.txt"))
+		repository.IndexFile(dir.Join("2.txt"))
+		repository.RemoveFile(dir.Join("0.txt"))
+
+		repository.IndexFile(dir.Join("a", "11.txt"))
+		repository.IndexFile(dir.Join("a", "4.txt"))
+		repository.RemoveFile(dir.Join("a", "3.txt"))
+
+		repository.SaveIndex()
 	}
 
-	// Subdir
+	// Test Restore
 	{
-		// Setup
-		{
-			// SAVE 0
-			{
-				fixtures.WriteFile(dir.Join("0.txt"), []byte("file 0 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("c", "8.txt"), []byte("file 8 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("a", "3.txt"), []byte("file 3 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("a", "5.txt"), []byte("file 5 (SAVE 0)."))
-				fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 (SAVE 0)."))
+		repository = GetRepository(dir.Path())
 
-				repository.IndexFile(dir.Join("0.txt"))
-				repository.IndexFile(dir.Join("1.txt"))
-				repository.IndexFile(dir.Join("2.txt"))
-				repository.IndexFile(dir.Join("a", "3.txt"))
-				repository.IndexFile(dir.Join("a", "4.txt"))
-				repository.IndexFile(dir.Join("a", "5.txt"))
-				repository.IndexFile(dir.Join("a", "b", "6.txt"))
-				repository.IndexFile(dir.Join("c", "8.txt"))
-				repository.SaveIndex()
-				save, _ = repository.CreateSave("SAVE 0")
-			}
+		repository.Restore(save0.Id, "a")
 
-			// SAVE 1
-			{
-				repository = GetRepository(dir.Path())
+		repository = GetRepository(dir.Path())
 
-				fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 (SAVE 0) (SAVE 1)."))
-				fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 (SAVE 0) (SAVE 1)."))
-				repository.IndexFile(dir.Join("1.txt"))
-				repository.IndexFile(dir.Join("2.txt"))
-				repository.SaveIndex()
-				repository.CreateSave("SAVE 1")
-			}
-
-			// Changes outside of "a" dir
-
-			{
-				// create
-				fixtures.WriteFile(dir.Join("9.txt"), []byte("new file 9 content."))
-				fixtures.WriteFile(dir.Join("10.txt"), []byte("new file 10 content."))
-
-				// update
-				fixtures.WriteFile(dir.Join("1.txt"), []byte("file 1 updated content."))
-				fixtures.WriteFile(dir.Join("2.txt"), []byte("file 2 updated content."))
-
-				// delete
-				fixtures.RemoveFile(dir.Join("c", "8.txt"))
-			}
-
-			// Changes inside "a" dir
-
-			{
-				// create
-				fixtures.WriteFile(dir.Join("a", "11.txt"), []byte("new file 11 content."))
-				fixtures.WriteFile(dir.Join("a", "12.txt"), []byte("new file 12 content."))
-
-				// update
-				fixtures.WriteFile(dir.Join("a", "4.txt"), []byte("file 4 updated content."))
-				fixtures.WriteFile(dir.Join("a", "b", "6.txt"), []byte("file 6 updated content."))
-
-				// delete
-				fixtures.RemoveFile(dir.Join("a", "5.txt"))
-			}
-
-			// Apply index
-			repository = GetRepository(dir.Path())
-
-			repository.IndexFile(dir.Join("9.txt"))
-			repository.IndexFile(dir.Join("2.txt"))
-			repository.RemoveFile(dir.Join("0.txt"))
-
-			repository.IndexFile(dir.Join("a", "11.txt"))
-			repository.IndexFile(dir.Join("a", "4.txt"))
-			repository.RemoveFile(dir.Join("a", "3.txt"))
-
-			repository.SaveIndex()
-		}
-
-		// Test Save
-		{
-			repository = GetRepository(dir.Path())
-
-			fsAssert.Equal(t, len(repository.index), 6)
-
-			repository.Restore(save.Id, "a")
-
-			repository = GetRepository(dir.Path())
-
-			fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
-			fsAssert.Equal(t, len(repository.index), 3)
-			assert.EqualValues(
-				t,
-				collections.Map(repository.index, func(change *directories.Change, _ int) string {
-					if change.ChangeType == directories.Removal {
-						return change.Removal.Filepath
-					}
-					return change.File.Filepath
-				}),
-				[]string{dir.Join("9.txt"), dir.Join("2.txt"), dir.Join("0.txt")},
-			)
-			fsAssert.Assert(
-				t,
-				fs.Equal(
-					dir.Path(),
-					fs.Expected(
-						t,
-						fs.WithDir(filesystems.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
-						fs.WithFile("1.txt", "file 1 updated content."),
-						fs.WithFile("2.txt", "file 2 updated content."),
-						fs.WithDir(
-							"a",
-							fs.WithFile("3.txt", "file 3 (SAVE 0)."),
-							fs.WithFile("4.txt", "file 4 (SAVE 0)."),
-							fs.WithFile("5.txt", "file 5 (SAVE 0)."),
-							fs.WithDir("b",
-								fs.WithFile("6.txt", "file 6 (SAVE 0)."),
-							)),
-						fs.WithFile("9.txt", "new file 9 content."),
-						fs.WithFile("10.txt", "new file 10 content."),
-						fs.WithDir("c"),
-					),
+		fsAssert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
+		fsAssert.Equal(t, len(repository.index), 6)
+		fsAssert.Assert(
+			t,
+			fs.Equal(
+				dir.Path(),
+				fs.Expected(
+					t,
+					fs.WithDir(filesystems.REPOSITORY_FOLDER_NAME, fs.MatchExtraFiles),
+					fs.WithFile("1.txt", "file 1 updated content."),
+					fs.WithFile("2.txt", "file 2 updated content."),
+					fs.WithDir(
+						"a",
+						fs.WithFile("3.txt", "file 3 (SAVE 0)."),
+						fs.WithFile("4.txt", "file 4 (SAVE 0)."),
+						fs.WithFile("5.txt", "file 5 (SAVE 0)."),
+						fs.WithDir("b",
+							fs.WithFile("6.txt", "file 6 (SAVE 0)."),
+						)),
+					fs.WithFile("9.txt", "new file 9 content."),
+					fs.WithFile("10.txt", "new file 10 content."),
+					fs.WithDir("c"),
 				),
-			)
-		}
+			),
+		)
 	}
-
 }
 
 func TestRestoreHistoryFileUnsavedChanges(t *testing.T) {
@@ -493,7 +520,7 @@ func TestRestoreHistoryFileUnsavedChanges(t *testing.T) {
 
 		repository = GetRepository(dir.Path())
 
-		fsAssert.Equal(t, len(repository.index), 1)
+		fsAssert.Equal(t, len(repository.index), 3)
 		fsAssert.Equal(t, repository.index[0].File.Filepath, dir.Join("3.txt"))
 		fsAssert.Assert(
 			t,
