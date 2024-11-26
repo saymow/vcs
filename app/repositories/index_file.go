@@ -38,7 +38,7 @@ func (repository *Repository) IndexFile(filepath string) error {
 		if stagedChangeIdx != -1 {
 			if repository.index[stagedChangeIdx].GetHash() != object.ObjectName {
 				// Remove change file object
-				repository.fs.RemoveObject(repository.index[stagedChangeIdx].File.ObjectName)
+				repository.fs.RemoveObject(repository.index[stagedChangeIdx].GetHash())
 			}
 
 			// Undo index existing change
