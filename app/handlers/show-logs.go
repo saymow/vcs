@@ -20,6 +20,10 @@ func ShowLogs() {
 	for _, saveLog := range log.History {
 		fmt.Fprintf(os.Stdout, "\033[33m %s ", saveLog.Checkpoint.Id)
 
+		if log.Head == saveLog.Checkpoint.Id {
+			fmt.Fprint(os.Stdout, "\033[31m(DETACHED HEAD) ")
+		}
+
 		if len(saveLog.Refs) > 0 {
 			fmt.Fprint(os.Stdout, "\033[34m(")
 
