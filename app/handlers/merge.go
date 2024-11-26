@@ -22,7 +22,7 @@ func Merge(name string) {
 	fmt.Printf("Ref \"%s\" merged succesfully.\n", name)
 
 	if status.HasChanges() {
-		fmt.Println("\nBut you have conflicts to resolve.")
+		fmt.Print("But you have conflicts to resolve:\n\n")
 		printStatus(status)
 	}
 

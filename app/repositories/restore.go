@@ -39,8 +39,7 @@ func (repository *Repository) getIndexDir() *directories.Node {
 //
 // Caveats:
 //
-//   - When applied to directory, Restore will remove all existing changes in the directory (forever) and
-//     restore the Save or HEAD + index.
+//   - Restore will remove the existing changes in the path (forever) and restore reference.
 //   - You can use Restore to recover a deleted file from the index or from a Save.
 //   - The HEAD is not changed during Restore.
 func (repository *Repository) Restore(ref string, path string) error {

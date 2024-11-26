@@ -17,6 +17,12 @@ func ShowLogs() {
 	repository := repositories.GetRepository(root)
 	log := repository.GetLogs()
 
+	if len(log.History) == 0 {
+		fmt.Println("Empty saves history.")
+
+		return
+	}
+
 	for _, saveLog := range log.History {
 		fmt.Fprintf(os.Stdout, "\033[33m %s ", saveLog.Checkpoint.Id)
 

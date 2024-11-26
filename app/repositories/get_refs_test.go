@@ -30,7 +30,7 @@ func TestRefs(t *testing.T) {
 		fixtures.ReadFile(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.HEAD_FILE_NAME)),
 		"feat/b",
 	)
-	assert.EqualValues(t, repository.GetRefs(), map[string]string{
+	assert.EqualValues(t, repository.GetRefs().Refs, map[string]string{
 		"master": save0.Id,
 		"feat/a": save0.Id,
 		"feat/b": save0.Id,
@@ -55,7 +55,7 @@ func TestRefs(t *testing.T) {
 			fixtures.ReadFile(dir.Join(filesystems.REPOSITORY_FOLDER_NAME, filesystems.HEAD_FILE_NAME)),
 			"feat/c",
 		)
-		assert.EqualValues(t, repository.GetRefs(), map[string]string{
+		assert.EqualValues(t, repository.GetRefs().Refs, map[string]string{
 			"master": save0.Id,
 			"feat/a": save0.Id,
 			"feat/b": save1.Id,
@@ -71,7 +71,7 @@ func TestRefs(t *testing.T) {
 		repository.SaveIndex()
 		lastSave, _ := repository.CreateSave("save message")
 
-		assert.EqualValues(t, repository.GetRefs(), map[string]string{
+		assert.EqualValues(t, repository.GetRefs().Refs, map[string]string{
 			"master": save0.Id,
 			"feat/a": save0.Id,
 			"feat/b": save1.Id,

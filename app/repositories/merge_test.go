@@ -93,7 +93,7 @@ func TestFastForwardMerge(t *testing.T) {
 	repository = GetRepository(dir.Path())
 
 	saveCheckpoint, err := repository.Merge(meta.refName)
-	refs := repository.GetRefs()
+	refs := repository.GetRefs().Refs
 
 	assert.Nil(t, err)
 	assert.Equal(t, saveCheckpoint.Id, meta.s2.Id)
@@ -188,7 +188,7 @@ func TestNewSaveMerge(t *testing.T) {
 
 	repository = GetRepository(dir.Path())
 	saveCheckpoint, err := repository.Merge(incoming)
-	refs := repository.GetRefs()
+	refs := repository.GetRefs().Refs
 
 	assert.Nil(t, err)
 	assert.NotEqual(t, saveCheckpoint.Id, s3)

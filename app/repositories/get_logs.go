@@ -6,6 +6,11 @@ import (
 	"slices"
 )
 
+type Log struct {
+	Head    string
+	History []*SaveLog
+}
+
 func (repository *Repository) GetLogs() *Log {
 	save := repository.getSave(repository.head)
 

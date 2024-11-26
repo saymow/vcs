@@ -22,11 +22,6 @@ type SaveLog struct {
 	Checkpoint *filesystems.Checkpoint
 }
 
-type Log struct {
-	Head    string
-	History []*SaveLog
-}
-
 type ConflictedFileStatus struct {
 	Filepath string
 	Message  string
