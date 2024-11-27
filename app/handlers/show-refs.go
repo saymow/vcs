@@ -16,12 +16,12 @@ func ShowRefs() {
 
 	for name, saveName := range refs.Refs {
 		if refs.Head == name {
-			fmt.Fprint(os.Stdout, "\033[34mHEAD \033[0m-> ")
+			fmt.Fprint(os.Stdout, "\033[0mHEAD \033[0m-> ")
 		}
 		fmt.Fprintf(os.Stdout, "\033[34m%s \033[0m-> \033[33m%s\n", name, saveName)
 	}
 
 	if _, ok := refs.Refs[refs.Head]; !ok {
-		fmt.Println("\n\033[0mHEAD is detached.")
+		fmt.Fprintf(os.Stdout, "\033[0mHEAD \033[0m-> \033[33m%s\n", refs.Head)
 	}
 }
