@@ -1,4 +1,3 @@
 .repository
-project
-project2
+project*
 vcs.exe
