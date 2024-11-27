@@ -14,7 +14,7 @@ func TestInvalidRef(t *testing.T) {
 	// Cannot create refs when there is no save history
 	{
 		assert.Error(t, repository.CreateRef("feat/a"), "cannot create refs when there is no save history.")
-		assert.EqualValues(t, repository.GetRefs(), map[string]string{
+		assert.EqualValues(t, repository.GetRefs().Refs, map[string]string{
 			"master": "",
 		})
 	}
@@ -31,7 +31,7 @@ func TestInvalidRef(t *testing.T) {
 
 		repository.CreateRef("feat/a")
 
-		assert.EqualValues(t, repository.GetRefs(), map[string]string{
+		assert.EqualValues(t, repository.GetRefs().Refs, map[string]string{
 			"master": save0.Id,
 			"feat/a": save0.Id,
 		})
@@ -43,7 +43,7 @@ func TestInvalidRef(t *testing.T) {
 		save1, _ := repository.CreateSave("save message")
 
 		assert.Error(t, repository.CreateRef("master"), "name already in use.")
-		assert.EqualValues(t, repository.GetRefs(), map[string]string{
+		assert.EqualValues(t, repository.GetRefs().Refs, map[string]string{
 			"master": save0.Id,
 			"feat/a": save1.Id,
 		})
