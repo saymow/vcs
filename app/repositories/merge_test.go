@@ -92,11 +92,11 @@ func TestFastForwardMerge(t *testing.T) {
 
 	repository = GetRepository(dir.Path())
 
-	saveCheckpoint, err := repository.Merge(meta.refName)
+	save, err := repository.Merge(meta.refName)
 	refs := repository.GetRefs().Refs
 
 	assert.Nil(t, err)
-	assert.Equal(t, saveCheckpoint.Id, meta.s2.Id)
+	assert.Equal(t, save.Checkpoint().Id, meta.s2.Id)
 	assert.Equal(t, repository.head, filesystems.INITIAL_REF_NAME)
 	assert.Equal(t, refs[filesystems.INITIAL_REF_NAME], refs[meta.refName])
 	assert.Equal(t, refs[meta.refName], meta.s2.Id)
@@ -162,7 +162,7 @@ func TestNewSaveMerge(t *testing.T) {
 
 	repository.IndexFile(dir.Join("c", "a.txt"))
 	repository.SaveIndex()
-	s3, _ := repository.CreateSave("s2")
+	s3, _ := repository.CreateSave("s3")
 
 	// Load ref
 
@@ -182,22 +182,24 @@ func TestNewSaveMerge(t *testing.T) {
 	repository.IndexFile(dir.Join("b.txt"))
 	repository.IndexFile(dir.Join("a", "a.txt"))
 	repository.SaveIndex()
-	s1Prime, _ := repository.CreateSave("s1'")
+	repository.CreateSave("s1'")
 
 	// Test
 
 	repository = GetRepository(dir.Path())
-	saveCheckpoint, err := repository.Merge(incoming)
+	save, err := repository.Merge(incoming)
 	refs := repository.GetRefs().Refs
 
 	assert.Nil(t, err)
-	assert.NotEqual(t, saveCheckpoint.Id, s3)
-	assert.NotEqual(t, saveCheckpoint.Id, s1Prime.Id)
-	assert.Equal(t, saveCheckpoint.Message, fmt.Sprintf("Merge \"%s\" at \"%s\".", incoming, meta.refName))
+	assert.Equal(t, save.Checkpoint().Message, fmt.Sprintf("Merge \"%s\" at \"%s\".", incoming, meta.refName))
+	assert.Equal(t, len(save.Checkpoint().Changes), 0)
+	assert.Equal(t, save.Checkpoints[len(save.Checkpoints)-2].Message, "s3")
+	assert.Equal(t, save.Checkpoints[len(save.Checkpoints)-3].Message, "s2")
+	assert.Equal(t, save.Checkpoints[len(save.Checkpoints)-4].Message, "s1")
+	assert.Equal(t, save.Checkpoints[len(save.Checkpoints)-5].Message, "s1'")
 	assert.Equal(t, repository.head, meta.refName)
 	assert.Equal(t, refs[incoming], s3.Id)
-	assert.Equal(t, refs[meta.refName], saveCheckpoint.Id)
-	assert.Equal(t, saveCheckpoint.Parent, s1Prime.Id)
+	assert.Equal(t, refs[meta.refName], save.Checkpoint().Id)
 	fsAssert.Assert(
 		t,
 		fs.Equal(
@@ -250,7 +252,7 @@ func TestNewSaveMerge(t *testing.T) {
 		repository = GetRepository(dir.Path())
 
 		// Load merge save
-		repository.Load(saveCheckpoint.Id)
+		repository.Load(save.Checkpoint().Id)
 
 		fsAssert.Assert(
 			t,
@@ -365,38 +367,18 @@ func TestIndexConflictsMerge(t *testing.T) {
 	repository.IndexFile(dir.Join("c", "a.txt"))
 	repository.IndexFile(dir.Join("c", "b.txt"))
 	repository.SaveIndex()
-	s2Prime, _ := repository.CreateSave("s2'")
+	repository.CreateSave("s2'")
 
 	// Test
 
 	repository = GetRepository(dir.Path())
 
-	checkpoint, err := repository.Merge(incoming)
+	save, err := repository.Merge(incoming)
 
 	changesMap := collections.ToMap(repository.index, func(change *directories.Change, _ int) string {
 		return change.GetPath()
 	})
 
-	assert.Equal(
-		t,
-		changesMap[dir.Join("a", "b", "c.txt")].ChangeType,
-		directories.Creation,
-	)
-	assert.Equal(
-		t,
-		changesMap[dir.Join("a", "b", "d.txt")].ChangeType,
-		directories.Creation,
-	)
-	assert.Equal(
-		t,
-		changesMap[dir.Join("a", "c.txt")].ChangeType,
-		directories.Creation,
-	)
-	assert.Equal(
-		t,
-		changesMap[dir.Join("a", "a.txt")].ChangeType,
-		directories.Removal,
-	)
 	assert.Equal(
 		t,
 		changesMap[dir.Join("a.txt")].ChangeType,
@@ -448,7 +430,11 @@ func TestIndexConflictsMerge(t *testing.T) {
 		"Conflict.",
 	)
 	assert.Nil(t, err)
-	assert.Equal(t, checkpoint.Id, s2Prime.Id)
+	assert.Equal(t, (*repository.refs)[repository.head], save.Checkpoint().Id)
+	assert.Equal(t, save.Checkpoint().Message, "s3")
+	assert.Equal(t, save.Checkpoints[len(save.Checkpoints)-2].Message, "s2")
+	assert.Equal(t, save.Checkpoints[len(save.Checkpoints)-3].Message, "s1")
+	assert.Equal(t, save.Checkpoints[len(save.Checkpoints)-4].Message, "s2'")
 	fsAssert.Assert(
 		t,
 		fs.Equal(
