@@ -396,7 +396,7 @@ func (fileSystem *FileSystem) RemoveObject(name string) {
 	errors.Check(err)
 }
 
-func (fileSystem *FileSystem) WriteSave(save *Checkpoint) string {
+func (fileSystem *FileSystem) WriteCheckpoint(save *Checkpoint) string {
 	var stringBuilder strings.Builder
 
 	_, err := stringBuilder.Write([]byte(fmt.Sprintf("%s\n", save.Message)))

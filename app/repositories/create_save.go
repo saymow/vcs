@@ -23,7 +23,7 @@ func (repository *Repository) CreateSave(message string) (*filesystems.Checkpoin
 		CreatedAt: time.Now(),
 	}
 
-	save.Id = repository.fs.WriteSave(&save)
+	save.Id = repository.fs.WriteCheckpoint(&save)
 	repository.clearIndex()
 	repository.setRef(repository.head, save.Id)
 

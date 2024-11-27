@@ -61,7 +61,7 @@ func (repository *Repository) createConflictFile(refFile *directories.File, inco
 	}
 }
 
-func (repository *Repository) handleMergeSave(refSave *filesystems.Save, incomingSave *filesystems.Save, ref, incoming string) *filesystems.Checkpoint {
+func (repository *Repository) handleMergeSave(refSave *filesystems.Save, incomingSave *filesystems.Save, ref, incoming string) *filesystems.Save {
 	commonCheckpoint := refSave.FindFirstCommonCheckpointParent(incomingSave)
 	ancestorSave := repository.getSave(commonCheckpoint.Id)
 	dir := buildDir(repository.fs.Root, ancestorSave)
@@ -73,8 +73,6 @@ func (repository *Repository) handleMergeSave(refSave *filesystems.Save, incomin
 	})
 
 	refChangesMap := make(map[string]*directories.Change)
-	changes := []*directories.Change{}
-	hasConflict := false
 
 	for _, checkpoint := range refSave.Checkpoints[refCommonAncestorIdx+1:] {
 		for _, change := range checkpoint.Changes {
@@ -87,71 +85,103 @@ func (repository *Repository) handleMergeSave(refSave *filesystems.Save, incomin
 		}
 	}
 
+	conflictedChanges := []*directories.Change{}
+
 	for _, checkpoint := range incomingSave.Checkpoints[incomingAncestorIdx+1:] {
 		for _, incomingChange := range checkpoint.Changes {
 			normalizedPath, err := dir.NormalizePath(incomingChange.GetPath())
 			errors.Check(err)
 
+			refChange, ok := refChangesMap[incomingChange.GetPath()]
+
+			if !ok || !refChange.Conflicts(incomingChange) {
+				// No conflict found, go ahead
+
+				dir.AddNode(normalizedPath, incomingChange)
+				continue
+			}
+			// Otherwise, create conflict change
+
 			var change *directories.Change
 
-			if refChange, ok := refChangesMap[incomingChange.GetPath()]; ok && refChange.Conflicts(incomingChange) {
-				hasConflict = true
-
-				if refChange.ChangeType == directories.Removal {
-					change = &directories.Change{
-						ChangeType: directories.Conflict,
-						Conflict: &directories.FileConflict{
-							Filepath:   incomingChange.File.Filepath,
-							ObjectName: incomingChange.File.ObjectName,
-							Message:    fmt.Sprintf("Removed at \"%s\" but modified at \"%s\".", ref, incoming),
-						},
-					}
-				} else if incomingChange.ChangeType == directories.Removal {
-					change = &directories.Change{
-						ChangeType: directories.Conflict,
-						Conflict: &directories.FileConflict{
-							Filepath:   refChange.File.Filepath,
-							ObjectName: refChange.File.ObjectName,
-							Message:    fmt.Sprintf("Removed at \"%s\" but modified at \"%s\".", incoming, ref),
-						},
-					}
-				} else {
-					change = &directories.Change{
-						ChangeType: directories.Conflict,
-						Conflict:   repository.createConflictFile(refChange.File, incomingChange.File, ref, incoming),
-					}
+			switch {
+			case refChange.ChangeType == directories.Removal:
+				change = &directories.Change{
+					ChangeType: directories.Conflict,
+					Conflict: &directories.FileConflict{
+						Filepath:   incomingChange.File.Filepath,
+						ObjectName: incomingChange.File.ObjectName,
+						Message:    fmt.Sprintf("Removed at \"%s\" but modified at \"%s\".", ref, incoming),
+					},
 				}
-			} else {
-				change = incomingChange
+			case incomingChange.ChangeType == directories.Removal:
+				change = &directories.Change{
+					ChangeType: directories.Conflict,
+					Conflict: &directories.FileConflict{
+						Filepath:   refChange.File.Filepath,
+						ObjectName: refChange.File.ObjectName,
+						Message:    fmt.Sprintf("Removed at \"%s\" but modified at \"%s\".", incoming, ref),
+					},
+				}
+			default:
+				change = &directories.Change{
+					ChangeType: directories.Conflict,
+					Conflict:   repository.createConflictFile(refChange.File, incomingChange.File, ref, incoming),
+				}
 			}
 
-			changes = append(changes, change)
+			conflictedChanges = append(conflictedChanges, change)
 			dir.AddNode(normalizedPath, change)
 		}
 	}
 
+	// Apply changes on the working directory
 	repository.applyDir(dir)
 
-	if hasConflict {
-		repository.index = changes
+	// Append the incoming Checkpoints to the end of the refSave, to keep the incoming save history correct
+	incomingCheckpoints := incomingSave.Checkpoints[incomingAncestorIdx+1:]
+	leafCheckpointId := refSave.Id
+
+	for len(incomingCheckpoints) > 0 {
+		// Rebuild each checkpoint accordingly
+
+		incomingCheckpoint := incomingCheckpoints[0]
+
+		checkpoint := filesystems.Checkpoint{
+			Parent:    leafCheckpointId,
+			Message:   incomingCheckpoint.Message,
+			CreatedAt: time.Now(),
+			Changes:   incomingCheckpoint.Changes,
+		}
+		leafCheckpointId = repository.fs.WriteCheckpoint(&checkpoint)
+
+		incomingCheckpoints = incomingCheckpoints[1:]
+	}
+
+	if len(conflictedChanges) > 0 {
+		// Then populate the index with conflicting changes and let the user resolve the merge.
+
+		repository.setRef(repository.head, leafCheckpointId)
+		repository.index = conflictedChanges
 		repository.SaveIndex()
 
-		return nil
+		return repository.getSave(leafCheckpointId)
 	}
 
-	save := filesystems.Checkpoint{
+	// Otherwise, append merge checkpoint at the end
+	checkpoint := filesystems.Checkpoint{
 		Message:   fmt.Sprintf("Merge \"%s\" at \"%s\".", incoming, ref),
-		Parent:    refSave.Id,
+		Parent:    leafCheckpointId,
 		CreatedAt: time.Now(),
-		Changes:   changes,
+		Changes:   []*directories.Change{},
 	}
-	save.Id = repository.fs.WriteSave(&save)
-	repository.setRef(repository.head, save.Id)
+	checkpoint.Id = repository.fs.WriteCheckpoint(&checkpoint)
+	repository.setRef(repository.head, checkpoint.Id)
 
-	return &save
+	return repository.getSave(checkpoint.Id)
 }
 
-func (repository *Repository) Merge(ref string) (*filesystems.Checkpoint, error) {
+func (repository *Repository) Merge(ref string) (*filesystems.Save, error) {
 	if repository.isDetachedMode() {
 		return nil, &ValidationError{"cannot make changes in detached mode."}
 	}
@@ -178,16 +208,10 @@ func (repository *Repository) Merge(ref string) (*filesystems.Checkpoint, error)
 
 		repository.applyDir(dir)
 		repository.setRef(repository.head, incomingSave.Id)
-		return incomingSave.Checkpoint(), nil
+		return incomingSave, nil
 	}
 
 	save := repository.handleMergeSave(refSave, incomingSave, repository.head, ref)
-
-	if save == nil {
-		// No merge save is created, changes applied in the working dir + index
-
-		return refSave.Checkpoint(), nil
-	}
 
 	return save, nil
 }
