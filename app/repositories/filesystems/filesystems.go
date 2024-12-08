@@ -27,6 +27,8 @@ const (
 	REFS_FILE_NAME         = "refs"
 
 	INITIAL_REF_NAME = "master"
+
+	USER_FILES_PERMISSIONS = 0777
 )
 
 type Save struct {
@@ -560,7 +562,7 @@ func (fileSystem *FileSystem) ReadDirFile(file *directories.File) bytes.Buffer {
 }
 
 func (fileSystem *FileSystem) createFile(file *directories.File) {
-	sourceFile, err := os.OpenFile(file.Filepath, os.O_WRONLY|os.O_TRUNC, 0644)
+	sourceFile, err := os.OpenFile(file.Filepath, os.O_WRONLY|os.O_TRUNC, USER_FILES_PERMISSIONS)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			errors.Error(err.Error())
@@ -602,7 +604,7 @@ func (fileSystem *FileSystem) CreateNode(node *directories.Node) {
 		return
 	}
 
-	err := os.Mkdir(node.Dir.Path, 0644)
+	err := os.Mkdir(node.Dir.Path, USER_FILES_PERMISSIONS)
 	errors.Check(err)
 }
 
