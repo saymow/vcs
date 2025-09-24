@@ -2,6 +2,10 @@
 
 A simple version control system written in go.
 
+## Demo
+
+https://github.com/user-attachments/assets/855a16cd-d38b-4901-bd10-6c938d6fbfa5
+
 ## Commands
 
 ```
