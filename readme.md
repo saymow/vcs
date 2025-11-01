@@ -1,6 +1,6 @@
 <h1 align="center">Vcs</h1>
 
-A simple version control system written in go.
+My simple version control system written in go.
 
 ## Demo
 
